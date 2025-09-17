@@ -30,5 +30,3 @@ Subsequent runs reuse the on-disk cache (`data/openalex/*.json`, `data/arxiv/*.j
 - Build embedding/indexer pipeline that reads `data/samples/*.json`
 - Serve results through FastAPI + Streamlit for the class demo
 - Add pytest coverage for datasource parsing and caching behavior
-
-Everything stays within free-tier APIs; the heavier GPU tasks (embedding, rerank, summarise) run locally on your 4070 Ti.
