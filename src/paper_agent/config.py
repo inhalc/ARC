@@ -43,6 +43,7 @@ class Settings:
     http_timeout: float = float(os.environ.get("PAPER_AGENT_HTTP_TIMEOUT", "30"))
     embedding_model: str = os.environ.get("PAPER_AGENT_EMBED_MODEL", "BAAI/bge-base-en-v1.5")
     summary_model: str = os.environ.get("PAPER_AGENT_SUMMARY_MODEL", "facebook/bart-large-cnn")
+    summary_language: str = os.environ.get("PAPER_AGENT_SUMMARY_LANGUAGE", "zh")
     device: str = os.environ.get("PAPER_AGENT_DEVICE", "auto")
     top_k: int = int(os.environ.get("PAPER_AGENT_TOP_K", "20"))
     rerank_k: int = int(os.environ.get("PAPER_AGENT_RERANK_K", "10"))

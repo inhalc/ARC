@@ -1,4 +1,5 @@
-﻿<!DOCTYPE html>
+
+<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
@@ -10,10 +11,10 @@
     <header>
       <div class="brand">
         <h1>Related Paper Agent</h1>
-        <p>聚合 OpenAlex 与 arXiv，快速发现相关论文并生成 Why Related / Difference 报告。</p>
+        <p>综合 OpenAlex 与 arXiv，快速发现相关论文并生成 Why Related / Difference 报告。</p>
       </div>
       <div class="actions">
-        <button id="toggle-dark" type="button" aria-label="切换深浅色主题">🌗</button>
+        <button id="toggle-dark" type="button" aria-label="切换深浅色">☀️</button>
         <a class="repo" href="https://github.com/inhalc/ARC" target="_blank" rel="noreferrer">GitHub</a>
       </div>
     </header>
@@ -21,7 +22,7 @@
     <main>
       <section class="panel query-panel">
         <form id="search-form">
-          <label for="query">检索关键词 / 问题（英文效果最佳）</label>
+          <label for="query">检索关键词 / 主题（英文效果更好）</label>
           <input id="query" name="query" type="text" placeholder="例如：multimodal large language model" required />
           <div class="options">
             <fieldset>
@@ -44,9 +45,6 @@
               <label>
                 返回上限
                 <input type="number" name="top" min="1" max="100" value="20" />
-              </label>
-              <label class="checkbox">
-                <input type="checkbox" name="summary" checked /> 生成摘要精炼
               </label>
             </div>
           </div>
@@ -90,31 +88,42 @@
           </ul>
         </div>
 
-        <div id="status" class="status">请先输入关键词并点击检索。</div>
+        <div id="status" class="status">请输入关键词并开始检索。</div>
         <div id="results" class="results-list"></div>
       </section>
     </main>
 
     <template id="result-template">
       <article class="result-item">
-        <header>
-          <h3 class="title"></h3>
-          <div class="meta"></div>
+        <header class="result-header">
+          <div class="result-heading">
+            <h3 class="title"></h3>
+            <div class="meta"></div>
+          </div>
+          <a class="primary-link" target="_blank" rel="noreferrer">查看原文</a>
         </header>
-        <p class="summary"></p>
-        <div class="why"></div>
-        <div class="difference"></div>
-        <details>
+        <div class="result-body">
+          <section class="result-section summary-section">
+            <h4><span class="badge badge-summary">摘要精炼</span></h4>
+            <p class="summary"></p>
+          </section>
+          <section class="result-section why-section">
+            <h4><span class="badge badge-why">Why Related</span></h4>
+            <p class="why"></p>
+          </section>
+          <section class="result-section diff-section">
+            <h4><span class="badge badge-diff">Difference</span></h4>
+            <p class="difference"></p>
+          </section>
+        </div>
+        <details class="abstract-panel">
           <summary>展开原始摘要</summary>
           <p class="abstract"></p>
         </details>
-        <footer>
-          <a class="link" target="_blank" rel="noreferrer">查看原文</a>
-        </footer>
       </article>
     </template>
 
-    <button id="back-to-top" type="button" aria-label="返回顶部">⬆</button>
+    <button id="back-to-top" type="button" aria-label="回到顶部">↑</button>
 
     <script src="config.js"></script>
     <script src="app.js" type="module"></script>
