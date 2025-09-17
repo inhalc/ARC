@@ -1,7 +1,5 @@
 ﻿# Backend & Deployment Guide
 
-本文面向需要自行运行或部署后端的同学，普通访问者只需打开 GitHub Pages 页面即可。
-
 ## 1. 环境准备
 1. 克隆仓库并进入项目根目录。
 2. 安装依赖（包含开发工具）：
@@ -24,7 +22,7 @@
   PAPER_AGENT_OPENALEX_MAILTO=your_email@example.com
   PAPER_AGENT_ARXIV_EMAIL=your_email@example.com
   `
-- 后续可在此文件中追加其他可选配置（设备、模型路径等），启动脚本会自动加载，无需每次手动输入。
+- 其他可选配置（设备、模型路径等）也可写在 .env，脚本会自动读取，无需每次手动输入。
 
 ## 3. 启动后端服务
 - 开发模式（含热重载）：
@@ -38,28 +36,41 @@
   `
 - 健康检查：浏览器访问 http://localhost:8000/health 应返回 {"status": "ok"}。
 
-## 4. 前端对接
-1. 修改 rontend/config.js：
+## 4. 让前端访问后端
+1. 编辑 rontend/config.js：
    `js
-   // 若使用本地后端保持 localhost，部署到公网时改成实际 API 域名
    const DEFAULT_API = window.location.hostname.endsWith('github.io')
      ? 'https://your-backend.example.com'
      : 'http://localhost:8000';
    `
-   （代码中已内置此逻辑，你只需把占位域名替换成真实后端。）
-2. 推送到 main 分支后，.github/workflows/deploy-pages.yml 会自动发布 rontend/。
+   将占位域名替换成真实的后端地址；若只在本地调试可保持默认。
+2. 推送到 main 后，.github/workflows/deploy-pages.yml 会自动发布 rontend/。
 3. 在 GitHub 仓库 Settings → Pages 中将 Source 设为 “GitHub Actions”。
 
-## 5. 数据与报告
+## 5. 内网穿透（临时对外展示）
+当不方便购买云服务器时，可以把本地服务临时映射到公网：
+
+1. 注册并下载客户端：<https://ngrok.com/>
+2. 配置 token：
+grok config add-authtoken <your-token>。
+3. 运行：
+   `ash
+   ngrok http 8000
+   `
+   终端里的 Forwarding https://xxxx.ngrok.io 即为后端地址，同样填入 rontend/config.js。
+
+两种方案都需要保持本地服务和隧道进程常开；免费版会定期断线或变更域名，建议演示前提前启动并测试。
+
+## 6. 数据与报告
 - 不启动服务也可直接生成离线报告：
   `ash
   python scripts/generate_report.py "multimodal large language model" --category cs.CL --markdown report.md --csv report.csv
   `
 - API 首次查询会自动抓取数据并写入 data/ 缓存，可按需定期清理。
 
-## 6. 常见问题
+## 7. 常见问题
 - **摘要生成偏慢**：切换轻量模型（如 philschmid/bart-large-cnn-samsum），或在前端取消“生成摘要精炼”。
 - **模型下载失败**：手动下载模型到 ~/.cache/huggingface，或设置镜像源。
 - **跨域错误**：默认允许全部来源，若部署自定义域名请在反向代理中放行。
 
-准备完毕后，访问 GitHub Pages 页面即可体验在线检索、导出与 Why Related / Difference 分析。
+准备完毕后，无论是在本地局域网还是通过临时隧道，都可以访问前端页面体验在线检索与 Why Related / Difference 分析。

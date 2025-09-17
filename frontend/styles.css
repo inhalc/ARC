@@ -388,5 +388,172 @@ body.dark #back-to-top {
   background: rgba(96, 165, 250, 0.85);
   color: #0b1120;
 }
-\n.progress {\n  margin-top: 1rem;\n  padding: 1rem 1.2rem;\n  border-radius: 16px;\n  border: 1px solid var(--border);\n  background: rgba(255, 255, 255, 0.9);\n  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);\n}\n.progress.hidden {\n  display: none;\n}\n.progress.show {\n  display: block;\n}\nbody.dark .progress {\n  background: rgba(30, 41, 59, 0.75);\n  border-color: rgba(148, 163, 184, 0.25);\n  box-shadow: 0 16px 30px rgba(8, 12, 24, 0.5);\n}\n.progress-bar {\n  width: 100%;\n  height: 6px;\n  border-radius: 999px;\n  background: rgba(148, 163, 184, 0.28);\n  overflow: hidden;\n}\n.progress-fill {\n  height: 100%;\n  width: 8%;\n  background: linear-gradient(90deg, var(--accent), rgba(37, 99, 235, 0.6));\n  border-radius: 999px;\n  transition: width 0.45s ease;\n}\n.progress-steps {\n  list-style: none;\n  display: flex;\n  gap: 1.1rem;\n  margin: 0.85rem 0 0;\n  padding: 0;\n  flex-wrap: wrap;\n  font-size: 0.9rem;\n  color: rgba(15, 23, 42, 0.6);\n}\nbody.dark .progress-steps {\n  color: rgba(226, 232, 240, 0.7);\n}\n.progress-steps li {\n  position: relative;\n  padding-left: 1.2rem;\n}\n.progress-steps li::before {\n  content: '\u2022';\n  position: absolute;\n  left: 0;\n  color: rgba(148, 163, 184, 0.6);\n}\n.progress-steps li.active {\n  color: var(--accent);\n  font-weight: 600;\n}\n.progress-steps li.active::before {\n  color: var(--accent);\n}\n.progress-steps li.done {\n  color: var(--fg);\n  opacity: 0.85;\n}\nbody.dark .progress-steps li.done {\n  color: rgba(226, 232, 240, 0.9);\n}\n
-\n.progress.error {\n  background: rgba(248, 113, 113, 0.18);\n  border-color: rgba(248, 113, 113, 0.4);\n}\nbody.dark .progress.error {\n  background: rgba(127, 29, 29, 0.4);\n  border-color: rgba(248, 113, 113, 0.35);\n}\n.progress.error .progress-fill {\n  background: linear-gradient(90deg, rgba(248, 113, 113, 0.9), rgba(239, 68, 68, 0.7));\n}\n.progress.error .progress-steps li.active {\n  color: rgba(185, 28, 28, 0.95);\n}\nbody.dark .progress.error .progress-steps li.active {\n  color: #fecaca;\n}\n
+
+.progress {
+  margin-top: 1rem;
+  padding: 1rem 1.2rem;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+.progress.hidden {
+  display: none;
+}
+.progress.show {
+  display: block;
+}
+body.dark .progress {
+  background: rgba(30, 41, 59, 0.75);
+  border-color: rgba(148, 163, 184, 0.25);
+  box-shadow: 0 16px 30px rgba(8, 12, 24, 0.5);
+}
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.28);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  width: 8%;
+  background: linear-gradient(90deg, var(--accent), rgba(37, 99, 235, 0.6));
+  border-radius: 999px;
+  transition: width 0.45s ease;
+}
+
+.progress-steps {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 0;
+  margin: 1rem 0 0;
+  padding: 0;
+  font-size: 0.95rem;
+  color: rgba(15, 23, 42, 0.65);
+}
+body.dark .progress-steps {
+  color: rgba(226, 232, 240, 0.75);
+}
+.progress-steps li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1;
+  min-width: 0;
+  padding-right: 0.5rem;
+}
+.progress-steps li::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: calc(32px + 0.6rem);
+  right: -0.5rem;
+  height: 3px;
+  background: rgba(148, 163, 184, 0.35);
+  transform: translateY(-50%);
+  z-index: 0;
+}
+.progress-steps li:last-child::after {
+  content: none;
+}
+.step-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid rgba(148, 163, 184, 0.35);
+  color: rgba(15, 23, 42, 0.65);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.95);
+  position: relative;
+  z-index: 1;
+  transition: background 0.3s ease, color 0.3s ease, border 0.3s ease, box-shadow 0.3s ease;
+}
+body.dark .step-icon {
+  background: rgba(30, 41, 59, 0.88);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: rgba(226, 232, 240, 0.75);
+}
+.step-label {
+  font-weight: 600;
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+  white-space: nowrap;
+}
+body.dark .step-label {
+  background: rgba(30, 41, 59, 0.92);
+  box-shadow: 0 2px 8px rgba(8, 12, 24, 0.45);
+}
+.progress-steps li.active .step-icon {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+.progress-steps li.done .step-icon {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.35);
+}
+body.dark .progress-steps li.active .step-icon {
+  background: rgba(96, 165, 250, 0.2);
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.2);
+}
+body.dark .progress-steps li.done .step-icon {
+  background: var(--accent);
+  color: #0b1120;
+}
+.progress-steps li.done::after,
+.progress-steps li.active::after {
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.78), rgba(37, 99, 235, 0.35));
+}
+body.dark .progress-steps li.done::after,
+body.dark .progress-steps li.active::after {
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.8), rgba(14, 116, 144, 0.35));
+}
+.progress-steps li.active .step-label {
+  color: var(--accent);
+}
+.progress-steps li.done .step-label {
+  color: var(--fg);
+}
+body.dark .progress-steps li.done .step-label {
+  color: rgba(226, 232, 240, 0.95);
+}
+
+.progress.error {
+  background: rgba(248, 113, 113, 0.18);
+  border-color: rgba(248, 113, 113, 0.4);
+}
+body.dark .progress.error {
+  background: rgba(127, 29, 29, 0.4);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+.progress.error .progress-fill {
+  background: linear-gradient(90deg, rgba(248, 113, 113, 0.9), rgba(239, 68, 68, 0.7));
+}
+.progress.error .progress-steps li::after {
+  background: rgba(248, 113, 113, 0.35);
+}
+.progress.error .progress-steps li.active .step-icon {
+  color: rgba(185, 28, 28, 0.95);
+  border-color: rgba(248, 113, 113, 0.6);
+  background: rgba(248, 113, 113, 0.18);
+  box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.28);
+}
+body.dark .progress.error .progress-steps li.active .step-icon {
+  color: #fecaca;
+}
+\n

@@ -57,7 +57,7 @@ const progress = (() => {
 
   const setFill = (value) => {
     if (fill) {
-      fill.style.width = ${value}%;
+      fill.style.width = `${value}%`;
     }
   };
 
@@ -151,19 +151,21 @@ const buildRequest = () => {
 
 const formatMeta = (item) => {
   const parts = [];
-  parts.push(${item.source.toUpperCase()} · 分数 );
+  parts.push(`${item.source.toUpperCase()} source`);
   if (item.authors_brief) {
-    parts.push(作者 );
+    parts.push(item.authors_brief);
   }
   if (item.venue) {
-    parts.push(${item.venue} ());
+    const withYear = item.year ? `${item.venue} (${item.year})` : item.venue;
+    parts.push(withYear);
   } else if (item.year) {
-    parts.push(年份 );
+    parts.push(`${item.year}`);
   }
   if (item.doi) {
-    parts.push(DOI );
-  }
-  return parts.join(" ｜ ");
+    parts.push(`DOI ${item.doi}`);
+  return parts.join(" · ");
+  return parts.join(" · ");
+};
 };
 
 const renderResults = (payload) => {
@@ -176,7 +178,7 @@ const renderResults = (payload) => {
     return;
   }
 
-  setStatus(共获取  篇候选，展示 Top  篇。, "success");
+  setStatus(`检索完成，共获取 ${payload.items.length} 条结果`, "success");
   downloadMdBtn.disabled = false;
   downloadCsvBtn.disabled = false;
 
@@ -185,8 +187,8 @@ const renderResults = (payload) => {
     fragment.querySelector(".title").textContent = item.title;
     fragment.querySelector(".meta").textContent = formatMeta(item);
     fragment.querySelector(".summary").textContent = item.summary || "暂无摘要精炼，可展开原始摘要查看详情。";
-    fragment.querySelector(".why").textContent = Why Related：;
-    fragment.querySelector(".difference").textContent = Difference：;
+    fragment.querySelector(".why").textContent = item.why_related || "未生成 Why Related 内容";
+    fragment.querySelector(".difference").textContent = item.difference || "未生成 Difference 内容";
     fragment.querySelector(".abstract").textContent = item.abstract || "摘要缺失";
     const linkEl = fragment.querySelector(".link");
     if (item.url) {
@@ -202,14 +204,14 @@ const renderResults = (payload) => {
 };
 
 const fetchJSON = async (endpoint, body) => {
-  const res = await fetch(${config.apiBase}, {
+  const res = await fetch(`${config.apiBase}${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(请求失败： );
+    throw new Error(`请求失败：${res.status} ${text}`);
   }
   return res.json();
 };
@@ -218,15 +220,13 @@ const download = async (type) => {
   if (!latestRequest) return;
   const endpoint = type === "markdown" ? "/api/export/markdown" : "/api/export/csv";
   const fileName = type === "markdown" ? "related-papers.md" : "related-papers.csv";
-  const res = await fetch(${config.apiBase}, {
+  const res = await fetch(`${config.apiBase}${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(latestRequest),
   });
   if (!res.ok) {
-    const text = await res.text();
-    alert(导出失败： );
-    return;
+    alert(`导出失败：${res.status} ${text}`);
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
