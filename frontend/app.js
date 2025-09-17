@@ -6,6 +6,7 @@ const downloadMdBtn = document.getElementById("download-md");
 const downloadCsvBtn = document.getElementById("download-csv");
 const toggleDark = document.getElementById("toggle-dark");
 const template = document.getElementById("result-template");
+const backToTopBtn = document.getElementById("back-to-top");
 
 let latestRequest = null;
 
@@ -21,7 +22,7 @@ const applyTheme = (mode) => {
 
 const initTheme = () => {
   const saved = localStorage.getItem("paper-agent-theme");
-  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
   applyTheme(saved || (prefersDark ? "dark" : "light"));
 };
 
@@ -31,6 +32,20 @@ toggleDark.addEventListener("click", () => {
   const next = document.body.classList.contains("dark") ? "light" : "dark";
   applyTheme(next);
 });
+
+const updateBackToTop = () => {
+  if (!backToTopBtn) return;
+  const shouldShow = window.scrollY > 320;
+  backToTopBtn.classList.toggle("show", shouldShow);
+};
+
+if (backToTopBtn) {
+  window.addEventListener("scroll", updateBackToTop);
+  backToTopBtn.addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  updateBackToTop();
+}
 
 const buildRequest = () => {
   const formData = new FormData(form);
@@ -52,17 +67,17 @@ const buildRequest = () => {
 
 const formatMeta = (item) => {
   const parts = [];
-  parts.push(`${item.source.toUpperCase()} · 分数 ${item.score}`);
+  parts.push(${item.source.toUpperCase()} · 分数 );
   if (item.authors_brief) {
-    parts.push(`作者 ${item.authors_brief}`);
+    parts.push(作者 );
   }
   if (item.venue) {
-    parts.push(`${item.venue} (${item.year || "未知"})`);
+    parts.push(${item.venue} ());
   } else if (item.year) {
-    parts.push(`年份 ${item.year}`);
+    parts.push(年份 );
   }
   if (item.doi) {
-    parts.push(`DOI ${item.doi}`);
+    parts.push(DOI );
   }
   return parts.join(" ｜ ");
 };
@@ -76,7 +91,7 @@ const renderResults = (payload) => {
     return;
   }
 
-  setStatus(`共获取 ${payload.total_candidates} 篇候选，展示 Top ${payload.returned} 篇。`, "success");
+  setStatus(共获取  篇候选，展示 Top  篇。, "success");
   downloadMdBtn.disabled = false;
   downloadCsvBtn.disabled = false;
 
@@ -85,8 +100,8 @@ const renderResults = (payload) => {
     fragment.querySelector(".title").textContent = item.title;
     fragment.querySelector(".meta").textContent = formatMeta(item);
     fragment.querySelector(".summary").textContent = item.summary || "暂无摘要精炼，可展开原始摘要查看详情。";
-    fragment.querySelector(".why").textContent = `Why Related：${item.why_related}`;
-    fragment.querySelector(".difference").textContent = `Difference：${item.difference}`;
+    fragment.querySelector(".why").textContent = Why Related：;
+    fragment.querySelector(".difference").textContent = Difference：;
     fragment.querySelector(".abstract").textContent = item.abstract || "摘要缺失";
     const linkEl = fragment.querySelector(".link");
     if (item.url) {
@@ -100,14 +115,14 @@ const renderResults = (payload) => {
 };
 
 const fetchJSON = async (endpoint, body) => {
-  const res = await fetch(`${config.apiBase}${endpoint}`, {
+  const res = await fetch(${config.apiBase}, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`请求失败：${res.status} ${text}`);
+    throw new Error(请求失败： );
   }
   return res.json();
 };
@@ -116,14 +131,14 @@ const download = async (type) => {
   if (!latestRequest) return;
   const endpoint = type === "markdown" ? "/api/export/markdown" : "/api/export/csv";
   const fileName = type === "markdown" ? "related-papers.md" : "related-papers.csv";
-  const res = await fetch(`${config.apiBase}${endpoint}`, {
+  const res = await fetch(${config.apiBase}, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(latestRequest),
   });
   if (!res.ok) {
     const text = await res.text();
-    alert(`导出失败：${res.status} ${text}`);
+    alert(导出失败： );
     return;
   }
   const blob = await res.blob();
