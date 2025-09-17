@@ -1,8 +1,6 @@
 ﻿# Related Paper Agent
 
-一个面向课程展示的在线论文检索与比较助手。访问项目的 GitHub Pages 页面即可直接体验，无需克隆代码或本地部署。
-
-> 👉 在线体验地址：<https://inhalc.github.io/ARC/>
+一个面向课程展示的在线论文检索与比较助手。
 
 ## 页面能做什么
 - **关键词检索**：输入英文关键词（如 *multimodal large language model*），系统会同时查询 OpenAlex 与 arXiv 两个开放数据库。
