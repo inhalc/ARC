@@ -33,6 +33,90 @@ toggleDark.addEventListener("click", () => {
   applyTheme(next);
 });
 
+const progress = (() => {
+  const container = document.getElementById("progress-indicator");
+  if (!container) {
+    return { start() {}, complete() {}, fail() {} };
+  }
+  const fill = container.querySelector(".progress-fill");
+  const steps = Array.from(container.querySelectorAll("[data-step]"));
+  const sequence = steps.map((step) => step.dataset.step);
+  let timers = [];
+  let currentIndex = -1;
+
+  const clearTimers = () => {
+    timers.forEach((id) => clearTimeout(id));
+    timers = [];
+  };
+
+  const resetSteps = () => {
+    steps.forEach((el) => {
+      el.classList.remove("active", "done");
+    });
+  };
+
+  const setFill = (value) => {
+    if (fill) {
+      fill.style.width = ${value}%;
+    }
+  };
+
+  const showContainer = () => {
+    container.classList.remove("hidden", "error");
+    container.classList.add("show");
+  };
+
+  const hideContainer = () => {
+    container.classList.remove("show", "error");
+    container.classList.add("hidden");
+    setFill(8);
+    resetSteps();
+    currentIndex = -1;
+  };
+
+  const activateStep = (index) => {
+    if (index < 0 || index >= steps.length) return;
+    if (currentIndex !== -1 && steps[currentIndex]) {
+      steps[currentIndex].classList.remove("active");
+      steps[currentIndex].classList.add("done");
+    }
+    steps[index].classList.add("active");
+    currentIndex = index;
+    const progressRatio = (index + 1) / (sequence.length + 0.25);
+    setFill(Math.min(90, Math.max(15, progressRatio * 100)));
+  };
+
+  return {
+    start() {
+      clearTimers();
+      resetSteps();
+      showContainer();
+      setFill(10);
+      sequence.forEach((_, idx) => {
+        const timer = setTimeout(() => activateStep(idx), 350 * idx + 200);
+        timers.push(timer);
+      });
+    },
+    complete() {
+      clearTimers();
+      if (!container.classList.contains("show")) return;
+      if (currentIndex !== -1 && steps[currentIndex]) {
+        steps[currentIndex].classList.remove("active");
+        steps[currentIndex].classList.add("done");
+      }
+      steps.forEach((el) => el.classList.add("done"));
+      setFill(100);
+      setTimeout(hideContainer, 600);
+    },
+    fail() {
+      clearTimers();
+      container.classList.add("error");
+      setFill(95);
+      setTimeout(hideContainer, 1200);
+    },
+  };
+})();
+
 const updateBackToTop = () => {
   if (!backToTopBtn) return;
   const shouldShow = window.scrollY > 320;
@@ -88,6 +172,7 @@ const renderResults = (payload) => {
     setStatus("未找到结果，可以尝试换个关键词或缩小分类范围。", "warning");
     downloadMdBtn.disabled = true;
     downloadCsvBtn.disabled = true;
+    progress.complete();
     return;
   }
 
@@ -112,6 +197,8 @@ const renderResults = (payload) => {
     }
     resultsEl.appendChild(fragment);
   });
+
+  progress.complete();
 };
 
 const fetchJSON = async (endpoint, body) => {
@@ -163,6 +250,7 @@ form.addEventListener("submit", async (event) => {
   }
   latestRequest = request;
   setStatus("正在检索相关论文，请稍候…", "loading");
+  progress.start();
   resultsEl.innerHTML = "";
   downloadMdBtn.disabled = true;
   downloadCsvBtn.disabled = true;
@@ -172,6 +260,7 @@ form.addEventListener("submit", async (event) => {
   } catch (error) {
     console.error(error);
     setStatus(error.message || "检索失败，请稍后重试。", "error");
+    progress.fail();
   }
 });
 

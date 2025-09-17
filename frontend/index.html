@@ -65,6 +65,19 @@
             <button id="download-csv" type="button" disabled>导出 CSV</button>
           </div>
         </div>
+
+        <div id="progress-indicator" class="progress hidden">
+          <div class="progress-bar">
+            <div class="progress-fill"></div>
+          </div>
+          <ul class="progress-steps">
+            <li data-step="openalex">1. 获取 OpenAlex</li>
+            <li data-step="arxiv">2. 获取 arXiv</li>
+            <li data-step="rank">3. 语义排序</li>
+            <li data-step="summary">4. 生成摘要</li>
+          </ul>
+        </div>
+
         <div id="status" class="status">请先输入关键词并点击检索。</div>
         <div id="results" class="results-list"></div>
       </section>
