@@ -2,38 +2,94 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <title>Related Paper Agent Demo</title>
+    <title>Related Paper Agent</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header>
-      <h1>Related Paper Agent</h1>
-      <p>此页面将在后续集成前端应用（Streamlit/React 等）后自动部署至 GitHub Pages。</p>
+      <div class="brand">
+        <h1>Related Paper Agent</h1>
+        <p>聚合 OpenAlex 与 arXiv，快速发现相关论文并生成 Why Related / Difference 报告。</p>
+      </div>
+      <div class="actions">
+        <button id="toggle-dark" type="button" title="切换深浅色">🌓</button>
+        <a class="repo" href="https://github.com/inhalc/ARC" target="_blank" rel="noreferrer">GitHub</a>
+      </div>
     </header>
+
     <main>
-      <section>
-        <h2>当前进度</h2>
-        <ul>
-          <li>已完成 OpenAlex、arXiv 数据抓取与缓存模块。</li>
-          <li>即将接入向量检索、重排序与摘要流程。</li>
-          <li>此处暂以静态页面占位，便于验证部署流程。</li>
-        </ul>
+      <section class="panel query-panel">
+        <form id="search-form">
+          <label for="query">检索关键词 / 问题（英文效果最佳）</label>
+          <input id="query" name="query" type="text" placeholder="例如：multimodal large language model" required />
+          <div class="options">
+            <fieldset>
+              <legend>arXiv 分类（可多选）</legend>
+              <label><input type="checkbox" name="category" value="cs.AI" /> cs.AI</label>
+              <label><input type="checkbox" name="category" value="cs.CL" /> cs.CL</label>
+              <label><input type="checkbox" name="category" value="cs.LG" /> cs.LG</label>
+              <label><input type="checkbox" name="category" value="cs.CV" /> cs.CV</label>
+              <label><input type="checkbox" name="category" value="cs.RO" /> cs.RO</label>
+            </fieldset>
+            <div class="toggles">
+              <label>
+                OpenAlex 数量
+                <input type="number" name="openalex" min="0" max="200" value="60" />
+              </label>
+              <label>
+                arXiv 数量
+                <input type="number" name="arxiv" min="0" max="200" value="40" />
+              </label>
+              <label>
+                返回上限
+                <input type="number" name="top" min="1" max="100" value="20" />
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" name="summary" checked /> 生成摘要精炼
+              </label>
+            </div>
+          </div>
+          <div class="button-row">
+            <button type="submit">🚀 开始检索</button>
+            <button type="reset" class="quiet">重置</button>
+          </div>
+        </form>
       </section>
-      <section>
-        <h2>下一步</h2>
-        <ol>
-          <li>构建前端交互界面（建议 React/Vite 或 Streamlit 导出静态资源）。</li>
-          <li>将构建产物写入 <code>frontend/</code> 或单独的 build 目录。</li>
-          <li>GitHub Actions 会自动发布到 <code>gh-pages</code> 分支。</li>
-        </ol>
+
+      <section class="panel results-panel">
+        <div class="results-header">
+          <h2>检索结果</h2>
+          <div class="download">
+            <button id="download-md" type="button" disabled>导出 Markdown</button>
+            <button id="download-csv" type="button" disabled>导出 CSV</button>
+          </div>
+        </div>
+        <div id="status" class="status">请先输入关键词并点击检索。</div>
+        <div id="results" class="results-list"></div>
       </section>
     </main>
-    <footer>
-      <small>构建时间：<span id="build-time"></span></small>
-      <script>
-        document.getElementById('build-time').textContent = new Date().toLocaleString();
-      </script>
-    </footer>
+
+    <template id="result-template">
+      <article class="result-item">
+        <header>
+          <h3 class="title"></h3>
+          <div class="meta"></div>
+        </header>
+        <p class="summary"></p>
+        <div class="why"></div>
+        <div class="difference"></div>
+        <details>
+          <summary>展开原始摘要</summary>
+          <p class="abstract"></p>
+        </details>
+        <footer>
+          <a class="link" target="_blank" rel="noreferrer">查看原文</a>
+        </footer>
+      </article>
+    </template>
+
+    <script src="config.js"></script>
+    <script src="app.js" type="module"></script>
   </body>
 </html>

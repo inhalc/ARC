@@ -1,4 +1,4 @@
-"""Global configuration and defaults for the paper agent project."""
+﻿"""Global configuration and defaults for the paper agent project."""
 from __future__ import annotations
 
 import os
@@ -15,6 +15,11 @@ class Settings:
     arxiv_email: str | None = os.environ.get("PAPER_AGENT_ARXIV_EMAIL") or None
     cache_ttl_hours: int = int(os.environ.get("PAPER_AGENT_CACHE_TTL_HOURS", "72"))
     http_timeout: float = float(os.environ.get("PAPER_AGENT_HTTP_TIMEOUT", "30"))
+    embedding_model: str = os.environ.get("PAPER_AGENT_EMBED_MODEL", "BAAI/bge-base-en-v1.5")
+    summary_model: str = os.environ.get("PAPER_AGENT_SUMMARY_MODEL", "facebook/bart-large-cnn")
+    device: str = os.environ.get("PAPER_AGENT_DEVICE", "auto")
+    top_k: int = int(os.environ.get("PAPER_AGENT_TOP_K", "20"))
+    rerank_k: int = int(os.environ.get("PAPER_AGENT_RERANK_K", "10"))
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
