@@ -6,6 +6,32 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+def _load_env_file(path: Path) -> None:
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key:
+            continue
+        value = value.strip().strip("'\"")
+        os.environ.setdefault(key, value)
+
+
+def _bootstrap_env() -> None:
+    env_path = Path(os.environ.get("PAPER_AGENT_ENV_FILE", ".env"))
+    _load_env_file(env_path)
+
+
+default_env_loaded = False
+if not default_env_loaded:
+    _bootstrap_env()
+    default_env_loaded = True
+
+
 @dataclass(slots=True)
 class Settings:
     """Application settings resolved from environment variables."""

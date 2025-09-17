@@ -1,4 +1,4 @@
-﻿[project]
+[project]
 name = "paper-agent"
 version = "0.1.0"
 description = "Research paper agent data ingestion, retrieval, and serving"

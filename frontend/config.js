@@ -1,4 +1,11 @@
-﻿/* 配置后端 API 地址。部署到 GitHub Pages 后，将值改成公网可访问的 API 域名。 */
-window.__PAPER_AGENT_CONFIG__ = {
-  apiBase: 'http://localhost:8000',
-};
+﻿(() => {
+  const existing = window.__PAPER_AGENT_CONFIG__ || {};
+  const guess = window.location.hostname.endsWith('github.io')
+    ? 'https://YOUR-BACKEND-DOMAIN.example.com'
+    : 'http://localhost:8000';
+  const apiBase = (existing.apiBase || guess).replace(/\/$/, '');
+  window.__PAPER_AGENT_CONFIG__ = {
+    ...existing,
+    apiBase,
+  };
+})();
