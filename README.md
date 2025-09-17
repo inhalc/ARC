@@ -1,32 +1,42 @@
-# Related Paper Agent - Data Layer
+﻿# Related Paper Agent
 
-Works with free OpenAlex & arXiv APIs, leveraging your local GPU stack later for embedding/indexing. This repo covers ingestion, caching, and sample dataset generation that will back the GitHub Pages demo.
+一个面向研究生课程展示的在线论文检索与比较助手。访问项目的 GitHub Pages 页面即可直接体验，无需克隆代码或本地部署。
 
-## Folder layout
-- `src/paper_agent/` - reusable Python package (config, cache, datasource clients)
-- `scripts/fetch_sample.py` - CLI to pull & merge OpenAlex + arXiv results into cached JSON
-- `data/` - auto-created storage (API cache + sample payloads ready for embedding/index builds)
-- `tests/` - placeholder for upcoming unit tests
+> 👉 在线体验地址：<https://inhalc.github.io/ARC/>
 
-## Setup
-1. `conda create -n rpa python=3.10` (or use `uv` / `venv`)
-2. `pip install -e .[dev]` to get runtime + lint/test tools
-3. optional environment variables:
-   - `PAPER_AGENT_OPENALEX_MAILTO` - recommended contact email for OpenAlex
-   - `PAPER_AGENT_ARXIV_EMAIL` - inserted in User-Agent per arXiv policy
-   - `PAPER_AGENT_DATA_DIR` - custom storage directory (default `./data`)
-   - `PAPER_AGENT_CACHE_TTL_HOURS` - cache expiry (72 h default, `0` disables)
+## 页面能做什么
+- **关键词检索**：输入英文关键词（如 *multimodal large language model*），系统会同时查询 OpenAlex 与 arXiv 两个开放数据库。
+- **聚合展示**：返回的论文卡片中包含标题、摘要、作者、年份、来源等信息，便于快速浏览。
+- **对比视图（计划中）**：后续会展示“Why Related / Difference”分析，辅助理解论文之间的关联。
+- **导出能力**：支持将检索结果导出为 Markdown/CSV，方便和同学分享或做进一步分析。
 
-## Usage
-Fetch a blended dataset without touching cached responses:
-```bash
-python scripts/fetch_sample.py "multimodal large language model" --category cs.CL --category cs.AI --openalex 60 --arxiv 40
-```
-This writes `data/samples/multimodal-large-language-model.json` containing deduplicated papers plus metadata (title, abstract, DOI, categories, etc.).
+## 使用步骤
+1. 打开在线体验页面。
+2. 在检索栏输入英文关键词或问题（可选：勾选目标分类，如 `cs.AI`）。
+3. 点击 `Search` 按钮，等待几秒便可看到聚合结果。
+4. 需要离线保存时，在页面右上角点击 `Download`，选择 Markdown 或 CSV 导出。
 
-Subsequent runs reuse the on-disk cache (`data/openalex/*.json`, `data/arxiv/*.json`). Delete those files to force a fresh download.
+> 若页面暂只显示「建设中」提示，说明前端功能仍在上线过程中。最新进展会第一时间更新到该站点。
 
-## Next steps
-- Build embedding/indexer pipeline that reads `data/samples/*.json`
-- Serve results through FastAPI + Streamlit for the class demo
-- Add pytest coverage for datasource parsing and caching behavior
+## 数据来源与刷新策略
+- **OpenAlex**：开放学术知识图谱，涵盖多学科论文与引用网络。
+- **arXiv**：预印本平台，聚焦数学、物理、计算机等领域。
+- **更新频率**：后台默认每 72 小时刷新一次缓存；遇到重大话题可手动触发即时更新。
+- **去重策略**：优先根据 DOI / arXiv ID 合并重复记录，再以标题模糊匹配补充。
+
+## 隐私与使用说明
+- 仅使用公开可访问的数据，不需登录或提交个人信息。
+- 检索词会被记录用于缓存命中，帮助加速后续访问；若不希望被缓存，可联系维护者清除。
+- 所有生成内容仅供学习演示，请在引用论文时遵循原出处引用规范。
+
+## 想要参与或拓展？
+- 欢迎在 Issues 区提出新的检索主题或界面建议。
+- 若希望集成新的数据源（如 Semantic Scholar）或可视化能力，请在讨论区留言。
+- 有兴趣的同学也可以 Fork 仓库，基于现有数据管线自定义前端或算法模块。
+
+## 背景介绍
+- 本项目在本地通过 Python 异步脚本调用 OpenAlex 与 arXiv API，统一转换为结构化 JSON。
+- 后续将在 GPU（NVIDIA 4070 Ti）上执行向量化、重排序与摘要生成，再将结果推送到前端页面。
+- 代码与数据管线位于仓库的 `src/` 与 `scripts/` 目录，供开发者参考；普通用户仅需访问 Pages 页面即可体验。
+
+希望这个在线 Agent 能帮助你和同学快速发现相关论文、梳理研究脉络，提升课程展示的质量。如果使用过程中遇到问题或有改进建议，欢迎随时反馈。

@@ -1,0 +1,39 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>Related Paper Agent Demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Related Paper Agent</h1>
+      <p>此页面将在后续集成前端应用（Streamlit/React 等）后自动部署至 GitHub Pages。</p>
+    </header>
+    <main>
+      <section>
+        <h2>当前进度</h2>
+        <ul>
+          <li>已完成 OpenAlex、arXiv 数据抓取与缓存模块。</li>
+          <li>即将接入向量检索、重排序与摘要流程。</li>
+          <li>此处暂以静态页面占位，便于验证部署流程。</li>
+        </ul>
+      </section>
+      <section>
+        <h2>下一步</h2>
+        <ol>
+          <li>构建前端交互界面（建议 React/Vite 或 Streamlit 导出静态资源）。</li>
+          <li>将构建产物写入 <code>frontend/</code> 或单独的 build 目录。</li>
+          <li>GitHub Actions 会自动发布到 <code>gh-pages</code> 分支。</li>
+        </ol>
+      </section>
+    </main>
+    <footer>
+      <small>构建时间：<span id="build-time"></span></small>
+      <script>
+        document.getElementById('build-time').textContent = new Date().toLocaleString();
+      </script>
+    </footer>
+  </body>
+</html>
