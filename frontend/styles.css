@@ -39,13 +39,14 @@ header {
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem clamp(1rem, 2vw, 3rem);
-  position: static;
+  position: relative;
   background: rgba(255, 255, 255, 0.78);
   color: var(--fg);
   border-bottom: 1px solid var(--border);
   box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
   border-radius: 0 0 28px 28px;
   backdrop-filter: blur(14px);
+  z-index: 100;
 }
 
 body.dark header {
@@ -73,30 +74,366 @@ header .actions {
   align-items: center;
 }
 
-header .actions button {
-  background: rgba(17, 24, 39, 0.08);
+/* ===== 账户菜单 - 重新设计 ===== */
+
+/* 菜单容器 */
+.user-menu {
+  position: relative;
+}
+
+/* 触发按钮 - 只显示头像 */
+.user-button {
+  all: unset;
+  cursor: pointer;
+  display: block;
+}
+
+.user-avatar-wrapper {
+  position: relative;
+}
+
+.user-avatar-img {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: #fff;
+  transition: transform 0.2s ease;
+}
+
+.user-button:hover .user-avatar-img {
+  transform: scale(1.05);
+}
+
+.user-status-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 9px;
+  height: 9px;
+  background: #10b981;
+  border: 2px solid var(--bg-panel);
+  border-radius: 50%;
+}
+
+.dropdown-icon {
+  display: none;
+}
+
+/* 下拉面板 */
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 380px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(24px);
+  z-index: 10000;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body.dark .user-dropdown {
+  background: rgba(15, 23, 42, 0.98);
+  border-color: rgba(148, 163, 184, 0.15);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.user-dropdown.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px) scale(0.96);
+}
+
+/* 头部 */
+.dropdown-header {
+  padding: 1.25rem 1.25rem 1rem;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+body.dark .dropdown-header {
+  border-bottom-color: rgba(148, 163, 184, 0.1);
+}
+
+.dropdown-title {
+  font-size: 0.95rem;
+  font-weight: 700;
   color: var(--fg);
-  border: 1px solid rgba(17, 24, 39, 0.12);
-  width: 42px;
-  height: 42px;
+  margin-bottom: 0.25rem;
+}
+
+.dropdown-subtitle {
+  font-size: 0.78rem;
+  color: rgba(15, 23, 42, 0.55);
+  font-weight: 500;
+}
+
+body.dark .dropdown-subtitle {
+  color: rgba(226, 232, 240, 0.6);
+}
+
+/* 用户列表 */
+.user-list {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* 用户卡片 */
+.user-card {
+  /* 清除默认样式 */
+  all: unset;
+  box-sizing: border-box !important;
+  
+  /* 布局 - 使用 Flexbox 实现居中 */
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 1rem !important;
+  width: 100% !important;
+  padding: 1.2rem 1rem !important;
+  min-height: 88px !important;
+  
+  /* 外观 */
+  border-radius: 10px !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  
+  /* 交互 */
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.user-card:hover {
+  background: rgba(37, 99, 235, 0.08) !important;
+  border: 1px solid rgba(37, 99, 235, 0.15) !important;
+}
+
+.user-card.active {
+  background: rgba(37, 99, 235, 0.1) !important;
+  border: 1px solid rgba(37, 99, 235, 0.2) !important;
+}
+
+body.dark .user-card:hover {
+  background: rgba(96, 165, 250, 0.12) !important;
+  border: 1px solid rgba(96, 165, 250, 0.25) !important;
+}
+
+body.dark .user-card.active {
+  background: rgba(96, 165, 250, 0.12) !important;
+  border: 1px solid rgba(96, 165, 250, 0.3) !important;
+}
+
+/* 头像 */
+.user-card-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.7rem;
+  color: #fff;
+}
+
+.cv-avatar {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.nlp-avatar {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.robot-avatar {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+/* 用户信息 */
+.user-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.user-card-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.user-card-role {
+  font-size: 0.8rem;
+  color: rgba(15, 23, 42, 0.6);
+  font-weight: 500;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+body.dark .user-card-role {
+  color: rgba(226, 232, 240, 0.7);
+}
+
+.user-card-focus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+  width: 100%;
+}
+
+.focus-tag {
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(37, 99, 235, 0.08);
+  color: rgba(37, 99, 235, 0.85);
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  white-space: nowrap;
+}
+
+body.dark .focus-tag {
+  background: rgba(96, 165, 250, 0.15);
+  color: rgba(147, 197, 253, 0.95);
+  border-color: rgba(96, 165, 250, 0.2);
+}
+
+/* 选中标记 - 隐藏,改用左侧边框 */
+.user-card-check {
+  display: none;
+}
+
+/* 底部按钮区域 */
+.dropdown-footer {
+  padding: 0.75rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+body.dark .dropdown-footer {
+  border-top-color: rgba(148, 163, 184, 0.1);
+}
+
+/* 底部按钮 - 统一定义 */
+.manage-profiles-btn,
+.settings-btn {
+  /* 布局和尺寸 - 确保填满整个宽度 */
+  display: flex !important;
+  width: 100% !important;
+  min-height: 48px !important;
+  box-sizing: border-box !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0.75rem !important;
+  padding: 0.65rem 1rem !important;
+  margin: 0 !important;
+  
+  /* 清除默认按钮样式 */
+  background: transparent !important;
+  border: none !important;
+  border-radius: 10px !important;
+  
+  /* 文字样式 */
+  font-family: inherit !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  color: rgba(15, 23, 42, 0.7) !important;
+  text-align: left !important;
+  
+  /* 交互 */
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  
+  /* 清除全局按钮效果 */
+  transform: none !important;
+  box-shadow: none !important;
+  position: relative !important;
+}
+
+.manage-profiles-btn:hover,
+.settings-btn:hover {
+  background: rgba(37, 99, 235, 0.08) !important;
+  border: 1px solid rgba(37, 99, 235, 0.15) !important;
+  color: rgba(37, 99, 235, 1) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+body.dark .manage-profiles-btn,
+body.dark .settings-btn {
+  color: rgba(226, 232, 240, 0.7) !important;
+}
+
+body.dark .manage-profiles-btn:hover,
+body.dark .settings-btn:hover {
+  background: rgba(96, 165, 250, 0.12) !important;
+  border: 1px solid rgba(96, 165, 250, 0.25) !important;
+  color: rgba(147, 197, 253, 1) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.manage-profiles-btn svg,
+.settings-btn svg {
+  width: 16px !important;
+  height: 16px !important;
+  flex-shrink: 0 !important;
+  pointer-events: none !important;
+}
+
+.manage-profiles-btn span,
+.settings-btn span {
+  pointer-events: none !important;
+}
+
+header .actions button {
+  background: transparent !important;
+  color: var(--fg);
+  border: none !important;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  font-size: 1.1rem;
+  font-size: 1.35rem;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-shadow: none !important;
 }
 
 header .actions button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+  transform: scale(1.05);
+  box-shadow: none !important;
+  background: rgba(37, 99, 235, 0.08) !important;
 }
 
 body.dark header .actions button {
-  background: rgba(148, 163, 184, 0.22);
-  border-color: rgba(148, 163, 184, 0.32);
+  background: transparent !important;
+  border: none !important;
   color: #f8fafc;
+  box-shadow: none !important;
+}
+
+header .actions button:hover {
+  background: rgba(96, 165, 250, 0.12) !important;
+  box-shadow: none !important;
 }
 
 header .actions .repo {
@@ -419,6 +756,27 @@ body.dark .badge-origin { background: rgba(96, 165, 250, 0.28); color: #bfdbfe; 
   .button-row {
     flex-wrap: wrap;
   }
+
+  .user-info-compact {
+    display: none;
+  }
+
+  .user-dropdown {
+    right: 0;
+    left: auto;
+    width: 360px;
+    min-width: 320px;
+    max-width: calc(100vw - 2rem);
+  }
+  
+  .user-card {
+    padding: 0.85rem;
+  }
+  
+  .user-card-avatar {
+    width: 42px;
+    height: 42px;
+  }
 }
 
 .status[data-tone="loading"] {
@@ -545,7 +903,7 @@ body.dark .progress-steps {
   height: 3px;
   background: rgba(148, 163, 184, 0.35);
   transform: translateY(-50%);
-  z-index: 0;
+  z-index: -1;
 }
 .progress-steps li:last-child::after {
   content: none;
@@ -560,6 +918,9 @@ body.dark .progress-steps {
   align-items: center;
   justify-content: center;
   font-weight: 600;
+  background: var(--bg);
+  position: relative;
+  z-index: 1;
   background: rgba(255, 255, 255, 0.95);
   position: relative;
   z-index: 1;

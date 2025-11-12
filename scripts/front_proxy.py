@@ -28,7 +28,7 @@ async def _startup() -> None:
     app.state.backend_url = backend_url.rstrip("/")
     app.state.client = httpx.AsyncClient(
         base_url=app.state.backend_url,
-        timeout=httpx.Timeout(30.0, connect=10.0),
+        timeout=httpx.Timeout(300.0, connect=60.0),
         follow_redirects=True,
     )
 

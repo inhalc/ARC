@@ -11,10 +11,102 @@ const toggleDark = document.getElementById('toggle-dark');
 const template = document.getElementById('result-template');
 const backToTopBtn = document.getElementById('back-to-top');
 
+// 用户管理
+const userToggle = document.getElementById('user-toggle');
+const userDropdown = document.getElementById('user-dropdown');
+const currentUserAvatar = document.getElementById('current-user-avatar');
+const userCards = document.querySelectorAll('.user-card');
+
 let latestRequest = null;
 
 const DARK_ICON = '\u263D';
 const LIGHT_ICON = '\u2600';
+
+// 用户配置:不同用户的隐藏关键词
+const USER_PROFILES = {
+  cv: {
+    name: 'Dr. Chen',
+    displayName: 'Dr. Chen',
+    avatar: 'CV',
+    role: '计算机视觉',
+    fullRole: '计算机视觉研究员',
+    hiddenKeywords: ['computer vision', 'image processing', 'visual recognition', 'image understanding'],
+    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+  },
+  nlp: {
+    name: 'Dr. Wang',
+    displayName: 'Dr. Wang',
+    avatar: 'NLP',
+    role: '自然语言处理',
+    fullRole: '自然语言处理专家',
+    hiddenKeywords: ['natural language processing', 'text analysis', 'linguistic', 'language model'],
+    gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
+  },
+  robot: {
+    name: 'Dr. Liu',
+    displayName: 'Dr. Liu',
+    avatar: 'EM',
+    role: '具身智能',
+    fullRole: '具身智能专家',
+    hiddenKeywords: ['embodied intelligence', 'embodied AI', 'robotics', 'autonomous systems'],
+    gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
+  }
+};
+
+// 获取当前用户
+const getCurrentUser = () => {
+  return localStorage.getItem('paper-agent-user') || 'cv';
+};
+
+// 设置当前用户
+const setCurrentUser = (userId) => {
+  localStorage.setItem('paper-agent-user', userId);
+  const profile = USER_PROFILES[userId];
+  if (profile) {
+    currentUserAvatar.textContent = profile.avatar;
+    currentUserAvatar.style.background = profile.gradient;
+  }
+  // 更新激活状态
+  userCards.forEach(card => {
+    card.classList.toggle('active', card.dataset.user === userId);
+  });
+};
+
+// 初始化用户
+const initUser = () => {
+  const currentUser = getCurrentUser();
+  setCurrentUser(currentUser);
+};
+
+// 用户菜单切换
+userToggle.addEventListener('click', (e) => {
+  e.stopPropagation();
+  userToggle.classList.toggle('active');
+  userDropdown.classList.toggle('hidden');
+});
+
+// 点击外部关闭菜单
+document.addEventListener('click', (e) => {
+  if (!userToggle.contains(e.target) && !userDropdown.contains(e.target)) {
+    userToggle.classList.remove('active');
+    userDropdown.classList.add('hidden');
+  }
+});
+
+// 用户选项点击
+userCards.forEach(card => {
+  card.addEventListener('click', () => {
+    const userId = card.dataset.user;
+    const profile = USER_PROFILES[userId];
+    setCurrentUser(userId);
+    userToggle.classList.remove('active');
+    userDropdown.classList.add('hidden');
+    // 显示提示
+    setStatus(`已切换到 ${profile.displayName} 的研究视角 - ${profile.fullRole}`, 'success');
+  });
+});
+
+initUser();
 
 const setStatus = (message, tone = 'info') => {
   statusEl.textContent = message;
@@ -140,8 +232,19 @@ if (backToTopBtn) {
 
 const buildRequest = () => {
   const formData = new FormData(form);
+  const userQuery = formData.get('query')?.trim();
+  
+  // 获取当前用户并添加隐藏关键词
+  const currentUser = getCurrentUser();
+  const profile = USER_PROFILES[currentUser];
+  
+  // 将用户查询和隐藏关键词组合(隐藏关键词不会显示在界面上)
+  const enhancedQuery = profile.hiddenKeywords.length > 0
+    ? `${userQuery} ${profile.hiddenKeywords.join(' ')}`
+    : userQuery;
+  
   return {
-    query: formData.get('query')?.trim(),
+    query: enhancedQuery,
     categories: formData.getAll('category'),
     openalex_limit: Number(formData.get('openalex')),
     arxiv_limit: Number(formData.get('arxiv')),
