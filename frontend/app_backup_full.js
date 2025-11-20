@@ -64,10 +64,10 @@ const DEFAULT_PROFILES = {
   cv: {
     id: 'cv',
     name: 'Dr. Chen',
-    roleType: 'expert', // expert, scholar, student
+    roleType: 'expert',
     roleLabel: 'CV 专家',
     avatar: 'CV',
-    tags: ['Computer Vision', 'Deep Learning'], // 对应 AVAILABLE_TAGS 的 label
+    tags: ['Computer Vision'],
     gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
   },
   nlp: {
@@ -78,6 +78,15 @@ const DEFAULT_PROFILES = {
     avatar: 'NLP',
     tags: ['NLP', 'Transformers / LLM'],
     gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
+  },
+  robot: {
+    id: 'robot',
+    name: 'Dr. Liu',
+    roleType: 'expert',
+    roleLabel: '具身智能专家',
+    avatar: 'EM',
+    tags: ['Robotics'],
+    gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
   }
 };
 
@@ -114,6 +123,7 @@ const setCurrentUser = (userId) => {
 // 初始化用户
 const initUser = () => {
   switchUser(localStorage.getItem('paper-agent-user') || 'cv'); // 确保加载时有默认用户
+  renderUserList(); // 初始化时渲染用户列表
 };
 
 // 用户菜单切换
@@ -188,6 +198,15 @@ const renderUserList = () => {
   const profiles = getAllProfiles();
   const currentId = localStorage.getItem('paper-agent-user') || 'cv';
   
+  console.log('📋 renderUserList called');
+  console.log('   Profiles:', Object.keys(profiles));
+  console.log('   Current ID:', currentId);
+  
+  if (!userListContainer) {
+    console.error('❌ userListContainer element not found!');
+    return;
+  }
+  
   userListContainer.innerHTML = '';
   
   Object.values(profiles).forEach(p => {
@@ -208,7 +227,10 @@ const renderUserList = () => {
       ${p.id === currentId ? '<div class="user-status-dot" style="position:relative;right:auto;border:none;"></div>' : ''}
     `;
     userListContainer.appendChild(btn);
+    console.log('   ✅ Added user card:', p.name);
   });
+  
+  console.log(`✅ Rendered ${Object.keys(profiles).length} user profiles successfully`);
 };
 
 const switchUser = (userId) => {
@@ -282,9 +304,36 @@ modalSave.onclick = () => {
 };
 
 // 事件绑定
-btnAddProfile.onclick = openModal;
-modalClose.onclick = closeModal;
-modalCancel.onclick = closeModal;
+if (btnAddProfile) {
+  btnAddProfile.onclick = (e) => {
+    e.stopPropagation();
+    console.log('Opening modal...');
+    openModal();
+  };
+  console.log('✅ btnAddProfile event bound');
+} else {
+  console.error('❌ btnAddProfile element not found!');
+}
+
+if (modalClose) {
+  modalClose.onclick = closeModal;
+  console.log('✅ modalClose event bound');
+}
+
+if (modalCancel) {
+  modalCancel.onclick = closeModal;
+  console.log('✅ modalCancel event bound');
+}
+
+// 绑定"账户设置"按钮
+const settingsBtnEl = document.getElementById('settings-btn');
+if (settingsBtnEl) {
+  settingsBtnEl.onclick = (e) => {
+    e.stopPropagation();
+    alert('账户设置功能即将推出！\n\n当前可用功能：\n- 切换研究视角\n- 新建自定义身份\n- 选择兴趣标签');
+  };
+  console.log('✅ settings button event bound');
+}
 
 const setStatus = (message, tone = 'info') => {
   statusEl.textContent = message;
@@ -765,15 +814,31 @@ const renderResults = (payload) => {
   downloadCsvBtn.disabled = false;
   
   // 显示并渲染关联网状图
+  console.log('🔍 Attempting to show relation graph...');
   const graphContainer = document.getElementById('relation-graph');
-  graphContainer.style.display = 'block';
-  
-  if (!graphInstance) {
-    graphInstance = new RelationGraph('relation-canvas');
+  if (graphContainer) {
+    console.log('✅ Graph container found, showing it...');
+    graphContainer.style.display = 'block';
+    
+    // 等待DOM更新后再初始化图谱
+    setTimeout(() => {
+      console.log('🎨 Initializing graph with', payload.items.length, 'items');
+      try {
+        if (!graphInstance) {
+          graphInstance = new RelationGraph('relation-canvas');
+          console.log('✅ RelationGraph instance created');
+        }
+        graphInstance.buildGraph(payload.items);
+        console.log('✅ Graph rendered successfully');
+      } catch (error) {
+        console.error('❌ Graph rendering failed:', error);
+      }
+    }, 100);
+  } else {
+    console.error('❌ Graph container element not found!');
   }
-  graphInstance.buildGraph(payload.items);
 
-  payload.items.forEach((item) => {
+  payload.items.forEach((item, index) => {
     const fragment = template.content.cloneNode(true);
     fragment.querySelector('.title').textContent = item.title;
     fragment.querySelector('.meta').textContent = formatMeta(item);
@@ -811,6 +876,7 @@ const renderResults = (payload) => {
     resultsEl.appendChild(fragment);
   });
 
+  console.log(`Rendered ${payload.items.length} result items`);
   progress.complete();
 };
 
@@ -894,4 +960,6 @@ document.getElementById('graph-export')?.addEventListener('click', () => {
 });
 
 // 初始化
+console.log('Initializing app...');
 initUser();
+console.log('App initialized');
