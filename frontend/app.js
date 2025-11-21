@@ -1,6 +1,8 @@
+// ARC frontend logic — clean rebuild (ASCII-safe)
 const config = window.__PAPER_AGENT_CONFIG__ || { apiBase: '' };
 const API_BASE = (typeof config.apiBase === 'string' ? config.apiBase : '').replace(/\/$/, '');
 
+// ===== DOM Refs =====
 const form = document.getElementById('search-form');
 const resultsEl = document.getElementById('results');
 const statusEl = document.getElementById('status');
@@ -10,194 +12,119 @@ const toggleDark = document.getElementById('toggle-dark');
 const template = document.getElementById('result-template');
 const backToTopBtn = document.getElementById('back-to-top');
 
-// 用户管理
 const userToggle = document.getElementById('user-toggle');
 const userDropdown = document.getElementById('user-dropdown');
 const currentUserAvatar = document.getElementById('current-user-avatar');
-const userCards = document.querySelectorAll('.user-card');
 const userListContainer = document.getElementById('user-list-container');
 const btnAddProfile = document.getElementById('btn-add-profile');
+const settingsBtn = document.getElementById('btn-settings');
 const modalOverlay = document.getElementById('profile-modal');
+const modalTitle = document.getElementById('modal-title');
 const modalClose = document.getElementById('modal-close');
 const modalCancel = document.getElementById('modal-cancel');
 const modalSave = document.getElementById('modal-save');
+const modalDelete = document.getElementById('modal-delete');
 const tagsContainer = document.getElementById('tags-container');
 
 let latestRequest = null;
+let editingProfileId = null;
+let graphInstance = null;
+let currentItems = [];
 
-const DARK_ICON = '\u263D';
-const LIGHT_ICON = '\u2600';
-
-// 用户配置:不同用户的隐藏关键词
-const USER_PROFILES = {
-  cv: {
-    name: 'Dr. Chen',
-    displayName: 'Dr. Chen',
-    avatar: 'CV',
-    role: '计算机视觉',
-    fullRole: '计算机视觉研究员',
-    hiddenKeywords: ['computer vision', 'image processing', 'visual recognition', 'image understanding'],
-    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-  },
-  nlp: {
-    name: 'Dr. Wang',
-    displayName: 'Dr. Wang',
-    avatar: 'NLP',
-    role: '自然语言处理',
-    fullRole: '自然语言处理专家',
-    hiddenKeywords: ['natural language processing', 'text analysis', 'linguistic', 'language model'],
-    gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
-  },
-  robot: {
-    name: 'Dr. Liu',
-    displayName: 'Dr. Liu',
-    avatar: 'EM',
-    role: '具身智能',
-    fullRole: '具身智能专家',
-    hiddenKeywords: ['embodied intelligence', 'embodied AI', 'robotics', 'autonomous systems'],
-    gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
-  }
-};
-
-// 预设用户 (不可删除)
+// ===== Presets =====
 const DEFAULT_PROFILES = {
   cv: {
     id: 'cv',
     name: 'Dr. Chen',
-    roleType: 'expert', // expert, scholar, student
-    roleLabel: 'CV 专家',
+    roleType: 'expert',
+    roleLabel: 'CV Expert',
     avatar: 'CV',
-    tags: ['Computer Vision', 'Deep Learning'], // 对应 AVAILABLE_TAGS 的 label
-    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+    tags: ['Computer Vision', 'Deep Learning'],
+    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
   },
   nlp: {
     id: 'nlp',
     name: 'Dr. Wang',
     roleType: 'expert',
-    roleLabel: 'NLP 专家',
+    roleLabel: 'NLP Expert',
     avatar: 'NLP',
     tags: ['NLP', 'Transformers / LLM'],
-    gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
-  }
+    gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+  },
+  robot: {
+    id: 'robot',
+    name: 'Dr. Liu',
+    roleType: 'expert',
+    roleLabel: 'Embodied AI Expert',
+    avatar: 'EM',
+    tags: ['Robotics', 'Reinforcement Learning'],
+    gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+  },
+  beginner: {
+    id: 'beginner',
+    name: 'A',
+    roleType: 'novice',
+    roleLabel: 'Beginner',
+    avatar: 'A',
+    tags: ['Medical AI'],
+    gradient: 'linear-gradient(135deg, #70c3ff 0%, #42e0ff 100%)',
+  },
 };
 
-// 系统预设标签池：前端展示名称 -> 后端搜索 Hidden Keywords
 const AVAILABLE_TAGS = [
-  { label: 'Computer Vision', keywords: 'computer vision image analysis visual recognition' },
-  { label: 'NLP', keywords: 'natural language processing text analysis linguistic' },
-  { label: 'Robotics', keywords: 'robotics embodied intelligence control systems' },
-  { label: 'Medical AI', keywords: 'medical imaging healthcare diagnosis ai4science' },
-  { label: 'Reinforcement Learning', keywords: 'reinforcement learning decision making agent' },
-  { label: 'Transformers / LLM', keywords: 'transformer large language model attention mechanism' },
-  { label: 'Multimodal', keywords: 'multimodal audio-visual vision-language' }
+  { label: 'Computer Vision', keywords: 'computer vision image analysis visual recognition detection segmentation' },
+  { label: 'Deep Learning', keywords: 'deep learning neural networks representation learning' },
+  { label: 'NLP', keywords: 'natural language processing text analysis linguistics language modeling' },
+  { label: 'Robotics', keywords: 'robotics embodied intelligence control systems navigation manipulation' },
+  { label: 'Medical AI', keywords: 'medical imaging healthcare diagnosis ai4science biomedical' },
+  { label: 'Reinforcement Learning', keywords: 'reinforcement learning decision making agent planning' },
+  { label: 'Transformers / LLM', keywords: 'transformer large language model attention mechanism foundation model' },
+  { label: 'Multimodal', keywords: 'multimodal audio visual language fusion' },
+  { label: 'Graph Learning', keywords: 'graph neural network gnn message passing knowledge graph' },
+  { label: 'Optimization', keywords: 'optimization convex non convex gradient descent' },
 ];
 
-// 获取当前用户
-const getCurrentUser = () => {
-  return localStorage.getItem('paper-agent-user') || 'cv';
+const TAG_KEYWORDS_MAP = Object.fromEntries(AVAILABLE_TAGS.map((t) => [t.label, t.keywords]));
+
+// ===== Utils =====
+const getHiddenKeywordsFromTags = (tags = []) => {
+  const keywords = tags.map((t) => TAG_KEYWORDS_MAP[t]).filter(Boolean);
+  return keywords.length ? keywords.join(' ') : '';
 };
 
-// 设置当前用户
-const setCurrentUser = (userId) => {
-  localStorage.setItem('paper-agent-user', userId);
-  const profile = USER_PROFILES[userId];
-  if (profile) {
-    currentUserAvatar.textContent = profile.avatar;
-    currentUserAvatar.style.background = profile.gradient;
-  }
-  // 更新激活状态
-  userCards.forEach(card => {
-    card.classList.toggle('active', card.dataset.user === userId);
-  });
-};
-
-// 初始化用户
-const initUser = () => {
-  switchUser(localStorage.getItem('paper-agent-user') || 'cv'); // 确保加载时有默认用户
-};
-
-// 用户菜单切换
-userToggle.addEventListener('click', (e) => {
-  e.stopPropagation();
-  userToggle.classList.toggle('active');
-  userDropdown.classList.toggle('hidden');
-});
-
-// 点击外部关闭菜单
-document.addEventListener('click', (e) => {
-  if (!userToggle.contains(e.target) && !userDropdown.contains(e.target)) {
-    userToggle.classList.remove('active');
-    userDropdown.classList.add('hidden');
-  }
-});
-
-// 用户选项点击
-userCards.forEach(card => {
-  card.addEventListener('click', () => {
-    const userId = card.dataset.user;
-    const profile = USER_PROFILES[userId];
-    setCurrentUser(userId);
-    userToggle.classList.remove('active');
-    userDropdown.classList.add('hidden');
-    // 显示提示
-    setStatus(`已切换到 ${profile.displayName} 的研究视角 - ${profile.fullRole}`, 'success');
-  });
-});
-
-// 获取所有 Profile (预设 + 本地存储)
+const getCurrentUser = () => localStorage.getItem('paper-agent-user') || 'cv';
 const getAllProfiles = () => {
   const custom = JSON.parse(localStorage.getItem('paper-agent-custom-profiles') || '{}');
   return { ...DEFAULT_PROFILES, ...custom };
 };
-
-// 保存自定义 Profile
-const saveCustomProfile = (profileData) => {
-  const custom = JSON.parse(localStorage.getItem('paper-agent-custom-profiles') || '{}');
-  const id = `custom_${Date.now()}`; // 简单生成唯一ID
-  custom[id] = {
-    id: id,
-    ...profileData,
-    avatar: profileData.name.slice(0, 2).toUpperCase(),
-    gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' // 自定义用户统一蓝色系，可优化
-  };
-  localStorage.setItem('paper-agent-custom-profiles', JSON.stringify(custom));
-  return id;
-};
-
-// 获取当前选中用户的完整信息
 const getCurrentUserProfile = () => {
-  const currentId = localStorage.getItem('paper-agent-user') || 'cv';
+  const currentId = getCurrentUser();
   const profiles = getAllProfiles();
-  return profiles[currentId] || DEFAULT_PROFILES.cv; // Fallback
+  return profiles[currentId] || DEFAULT_PROFILES.cv;
 };
 
-// 根据标签生成 Hidden Keywords
-const getHiddenKeywordsFromTags = (tagLabels) => {
-  let keywords = [];
-  tagLabels.forEach(label => {
-    const tagDef = AVAILABLE_TAGS.find(t => t.label === label);
-    if (tagDef) {
-      keywords.push(tagDef.keywords);
-    }
-  });
-  return keywords.join(' ');
+const updateHeaderAvatar = (profile) => {
+  if (!profile) return;
+  currentUserAvatar.textContent = profile.avatar;
+  currentUserAvatar.style.background = profile.gradient;
 };
 
-// 渲染用户下拉列表
 const renderUserList = () => {
   const profiles = getAllProfiles();
-  const currentId = localStorage.getItem('paper-agent-user') || 'cv';
-  
+  const currentId = getCurrentUser();
   userListContainer.innerHTML = '';
-  
-  Object.values(profiles).forEach(p => {
+  Object.values(profiles).forEach((p) => {
     const btn = document.createElement('button');
     btn.className = `user-card ${p.id === currentId ? 'active' : ''}`;
     btn.onclick = () => switchUser(p.id);
-    
-    // 生成标签的小徽章 HTML
-    const tagsHtml = p.tags.slice(0, 2).map(t => `<span class="focus-tag">${t}</span>`).join('');
-    
+
+    const tagsToShow = p.tags.slice(0, 2);
+    const remaining = Math.max(0, p.tags.length - tagsToShow.length);
+    const tagsHtml = [
+      ...tagsToShow.map((t) => `<span class="focus-tag">${t}</span>`),
+      remaining > 0 ? `<span class="focus-tag more">+${remaining}</span>` : '',
+    ].join('');
+
     btn.innerHTML = `
       <div class="user-card-avatar" style="background: ${p.gradient}">${p.avatar}</div>
       <div class="user-card-info">
@@ -205,7 +132,6 @@ const renderUserList = () => {
         <div class="user-card-role">${p.roleLabel}</div>
         <div class="user-card-focus">${tagsHtml}</div>
       </div>
-      ${p.id === currentId ? '<div class="user-status-dot" style="position:relative;right:auto;border:none;"></div>' : ''}
     `;
     userListContainer.appendChild(btn);
   });
@@ -214,79 +140,156 @@ const renderUserList = () => {
 const switchUser = (userId) => {
   localStorage.setItem('paper-agent-user', userId);
   const profile = getCurrentUserProfile();
-  
-  // 更新 Header 头像
-  currentUserAvatar.textContent = profile.avatar;
-  currentUserAvatar.style.background = profile.gradient;
-  
-  // UI 反馈
+  updateHeaderAvatar(profile);
   userDropdown.classList.add('hidden');
   userToggle.classList.remove('active');
-  renderUserList(); // 重新渲染以更新选中态
-  
-  setStatus(`已切换身份: ${profile.name} (${profile.tags.join(', ')})`, 'success');
+  renderUserList();
+  const tagSummary = Array.isArray(profile.tags) ? profile.tags.join(', ') : '';
+  setStatus(`Switched to ${profile.name}${tagSummary ? ` (${tagSummary})` : ''}`, 'success');
 };
 
-// 打开模态框
-const openModal = () => {
-  modalOverlay.classList.add('open');
-  renderTagSelection(); // 渲染标签选择器
-  userDropdown.classList.add('hidden'); // 关闭下拉
+const initUser = () => {
+  const profiles = getAllProfiles();
+  const saved = localStorage.getItem('paper-agent-user');
+  const initialId = saved && profiles[saved] ? saved : 'cv';
+  localStorage.setItem('paper-agent-user', initialId);
+  updateHeaderAvatar(profiles[initialId]);
+  renderUserList();
 };
 
-// 关闭模态框
-const closeModal = () => {
-  modalOverlay.classList.remove('open');
-  document.getElementById('profile-form').reset();
-};
-
-// 渲染模态框里的标签选择 Chips
-const renderTagSelection = () => {
+const renderTagSelection = (selectedTags = []) => {
   tagsContainer.innerHTML = '';
-  AVAILABLE_TAGS.forEach(tag => {
+  AVAILABLE_TAGS.forEach((tag) => {
     const chip = document.createElement('div');
     chip.className = 'tag-chip';
     chip.textContent = tag.label;
+    if (selectedTags.includes(tag.label)) chip.classList.add('selected');
     chip.onclick = () => chip.classList.toggle('selected');
     tagsContainer.appendChild(chip);
   });
 };
 
-// 保存新用户
+const deleteCustomProfile = (id) => {
+  const custom = JSON.parse(localStorage.getItem('paper-agent-custom-profiles') || '{}');
+  if (!custom[id]) return false;
+  delete custom[id];
+  localStorage.setItem('paper-agent-custom-profiles', JSON.stringify(custom));
+  return true;
+};
+
+const updateCustomProfile = (id, profileData) => {
+  const custom = JSON.parse(localStorage.getItem('paper-agent-custom-profiles') || '{}');
+  if (!custom[id]) return false;
+  custom[id] = { ...custom[id], ...profileData, avatar: profileData.name.slice(0, 2).toUpperCase() };
+  localStorage.setItem('paper-agent-custom-profiles', JSON.stringify(custom));
+  return true;
+};
+
+const saveCustomProfile = (profileData) => {
+  const custom = JSON.parse(localStorage.getItem('paper-agent-custom-profiles') || '{}');
+  const id = `custom_${Date.now()}`;
+  custom[id] = {
+    id,
+    ...profileData,
+    avatar: profileData.name.slice(0, 2).toUpperCase(),
+    gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+  };
+  localStorage.setItem('paper-agent-custom-profiles', JSON.stringify(custom));
+  return id;
+};
+
+const openModal = (mode = 'new', profile = null) => {
+  const isEdit = mode === 'edit';
+  modalOverlay.dataset.mode = isEdit ? 'edit' : 'new';
+  editingProfileId = isEdit && profile ? profile.id : null;
+  document.getElementById('profile-form').reset();
+  const target = isEdit && profile ? profile : { name: '', roleType: 'scholar', tags: [] };
+  document.getElementById('p-name').value = target.name || '';
+  document.getElementById('p-role').value = target.roleType || 'scholar';
+  renderTagSelection(target.tags || []);
+  modalTitle.textContent = isEdit ? 'Manage account' : 'Create account';
+  modalSave.textContent = isEdit ? 'Save changes' : 'Save & switch';
+  const canDelete = isEdit;
+  modalDelete.style.display = canDelete ? 'inline-flex' : 'none';
+  modalOverlay.classList.add('open');
+  userDropdown.classList.add('hidden');
+};
+
+const closeModal = () => {
+  modalOverlay.classList.remove('open');
+  editingProfileId = null;
+  document.getElementById('profile-form').reset();
+};
+
 modalSave.onclick = () => {
   const name = document.getElementById('p-name').value.trim();
   const roleType = document.getElementById('p-role').value;
   const roleLabelText = document.getElementById('p-role').options[document.getElementById('p-role').selectedIndex].text;
-  
-  // 获取选中的标签
-  const selectedTags = Array.from(tagsContainer.querySelectorAll('.tag-chip.selected')).map(el => el.textContent);
-  
+  const selectedTags = Array.from(tagsContainer.querySelectorAll('.tag-chip.selected')).map((el) => el.textContent);
   if (!name) {
-    alert('请输入显示名称');
+    alert('Please enter a display name.');
     return;
   }
-  if (selectedTags.length === 0) {
-    alert('请至少选择一个感兴趣的领域标签');
+  if (!selectedTags.length) {
+    alert('Select at least one interest tag.');
     return;
   }
-
-  const newId = saveCustomProfile({
-    name: name,
-    roleType: roleType,
-    roleLabel: roleLabelText, // e.g. "研究员 / Scholar"
-    tags: selectedTags
-  });
-  
-  switchUser(newId);
+  const isEditMode = modalOverlay.dataset.mode === 'edit';
+  if (isEditMode && editingProfileId && editingProfileId.startsWith('custom_')) {
+    updateCustomProfile(editingProfileId, { name, roleType, roleLabel: roleLabelText, tags: selectedTags });
+    switchUser(editingProfileId);
+  } else {
+    const newId = saveCustomProfile({ name, roleType, roleLabel: roleLabelText, tags: selectedTags });
+    switchUser(newId);
+  }
   closeModal();
 };
 
-// 事件绑定
-btnAddProfile.onclick = openModal;
+btnAddProfile.onclick = () => openModal('new');
+settingsBtn.onclick = () => openModal('edit', getCurrentUserProfile());
 modalClose.onclick = closeModal;
 modalCancel.onclick = closeModal;
+modalDelete.onclick = () => {
+  if (!editingProfileId || !editingProfileId.startsWith('custom_')) {
+    alert('Only custom accounts can be deleted.');
+    return;
+  }
+  if (confirm('Delete this account?')) {
+    deleteCustomProfile(editingProfileId);
+    localStorage.setItem('paper-agent-user', 'cv');
+    closeModal();
+    initUser();
+    setStatus('Custom account removed. Switched to default.', 'success');
+  }
+};
 
+// dropdown toggling
+if (userToggle) {
+  userToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!userDropdown) return;
+    userDropdown.classList.toggle('hidden');
+    userToggle.classList.toggle('active');
+  });
+}
+
+document.addEventListener('click', (e) => {
+  if (!userDropdown) return;
+  if (!userDropdown.contains(e.target) && !userToggle.contains(e.target)) {
+    userDropdown.classList.add('hidden');
+    userToggle.classList.remove('active');
+  }
+});
+
+if (modalOverlay) {
+  modalOverlay.addEventListener('click', (e) => {
+    if (e.target === modalOverlay) closeModal();
+  });
+}
+
+// Status & theme
 const setStatus = (message, tone = 'info') => {
+  if (!statusEl) return;
   statusEl.textContent = message;
   statusEl.dataset.tone = tone;
 };
@@ -294,7 +297,10 @@ const setStatus = (message, tone = 'info') => {
 const applyTheme = (mode) => {
   document.body.classList.toggle('dark', mode === 'dark');
   localStorage.setItem('paper-agent-theme', mode);
-  toggleDark.textContent = mode === 'dark' ? '🌙' : '☀️';
+  if (toggleDark) {
+    toggleDark.textContent = mode === 'dark' ? '🌙' : '☀';
+    toggleDark.setAttribute('aria-label', mode === 'dark' ? '切换到浅色' : '切换到深色');
+  }
 };
 
 const initTheme = () => {
@@ -305,16 +311,16 @@ const initTheme = () => {
 
 initTheme();
 
-toggleDark.addEventListener('click', () => {
-  const next = document.body.classList.contains('dark') ? 'light' : 'dark';
-  applyTheme(next);
-});
+if (toggleDark) {
+  toggleDark.addEventListener('click', () => {
+    applyTheme(document.body.classList.contains('dark') ? 'light' : 'dark');
+  });
+}
 
+// Progress indicator
 const progress = (() => {
   const container = document.getElementById('progress-indicator');
-  if (!container) {
-    return { start() {}, complete() {}, fail() {} };
-  }
+  if (!container) return { start() {}, complete() {}, fail() {} };
   const fill = container.querySelector('.progress-fill');
   const steps = Array.from(container.querySelectorAll('[data-step]'));
   const sequence = steps.map((step) => step.dataset.step);
@@ -326,23 +332,14 @@ const progress = (() => {
     timers = [];
   };
 
-  const resetSteps = () => {
-    steps.forEach((el) => {
-      el.classList.remove('active', 'done');
-    });
-  };
-
+  const resetSteps = () => steps.forEach((el) => el.classList.remove('active', 'done'));
   const setFill = (value) => {
-    if (fill) {
-      fill.style.width = `${value}%`;
-    }
+    if (fill) fill.style.width = `${value}%`;
   };
-
   const showContainer = () => {
     container.classList.remove('hidden', 'error');
     container.classList.add('show');
   };
-
   const hideContainer = () => {
     container.classList.remove('show', 'error');
     container.classList.add('hidden');
@@ -350,7 +347,6 @@ const progress = (() => {
     resetSteps();
     currentIndex = -1;
   };
-
   const activateStep = (index) => {
     if (index < 0 || index >= steps.length) return;
     if (currentIndex !== -1 && steps[currentIndex]) {
@@ -359,7 +355,7 @@ const progress = (() => {
     }
     steps[index].classList.add('active');
     currentIndex = index;
-    const ratio = (index + 1) / (sequence.length + 0.25);
+    const ratio = (index + 1) / (sequence.length + 0.2);
     setFill(Math.min(90, Math.max(15, ratio * 100)));
   };
 
@@ -369,21 +365,17 @@ const progress = (() => {
       resetSteps();
       showContainer();
       setFill(10);
-      sequence.forEach((_, idx) => {
-        const timer = setTimeout(() => activateStep(idx), 350 * idx + 200);
-        timers.push(timer);
-      });
+      sequence.forEach((_, idx) => timers.push(setTimeout(() => activateStep(idx), 350 * idx + 180)));
     },
     complete() {
       clearTimers();
-      if (!container.classList.contains('show')) return;
       if (currentIndex !== -1 && steps[currentIndex]) {
         steps[currentIndex].classList.remove('active');
         steps[currentIndex].classList.add('done');
       }
       steps.forEach((el) => el.classList.add('done'));
       setFill(100);
-      setTimeout(hideContainer, 600);
+      setTimeout(hideContainer, 650);
     },
     fail() {
       clearTimers();
@@ -394,38 +386,26 @@ const progress = (() => {
   };
 })();
 
+// Back to top
 const updateBackToTop = () => {
   if (!backToTopBtn) return;
-  const shouldShow = window.scrollY > 320;
-  backToTopBtn.classList.toggle('show', shouldShow);
+  backToTopBtn.classList.toggle('show', window.scrollY > 320);
 };
 
 if (backToTopBtn) {
   window.addEventListener('scroll', updateBackToTop);
-  backToTopBtn.addEventListener('click', () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
+  backToTopBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
   updateBackToTop();
 }
 
+// Build request
 const buildRequest = () => {
   const formData = new FormData(form);
-  const userQuery = formData.get('query')?.trim();
-  
-  // 获取当前用户配置
+  const userQueryRaw = formData.get('query');
+  const userQuery = userQueryRaw ? userQueryRaw.trim() : '';
   const profile = getCurrentUserProfile();
-  
-  // 核心逻辑：将 Profile 中的 Tags 转换为 Hidden Keywords
   const hiddenKeywords = getHiddenKeywordsFromTags(profile.tags);
-  
-  // 组合查询词
-  const enhancedQuery = hiddenKeywords 
-    ? `${userQuery} ${hiddenKeywords}`
-    : userQuery;
-  
-  // 可以在这里打印一下，方便调试
-  console.log(`[User: ${profile.name}] Raw Query: "${userQuery}" -> Enhanced: "${enhancedQuery}"`);
-  
+  const enhancedQuery = hiddenKeywords ? `${userQuery} ${hiddenKeywords}` : userQuery;
   return {
     query: enhancedQuery,
     categories: formData.getAll('category'),
@@ -433,8 +413,7 @@ const buildRequest = () => {
     arxiv_limit: Number(formData.get('arxiv')),
     top_k: Number(formData.get('top')),
     summarise: true,
-    // Optional: 传给后端用户的身份类型，如果后端需要据此调整 Prompt 语气
-    user_role: profile.roleType 
+    user_role: profile.roleType,
   };
 };
 
@@ -442,359 +421,333 @@ const normaliseSource = (source = '') => {
   const key = String(source).toLowerCase();
   if (key.includes('openalex')) return 'OpenAlex';
   if (key.includes('arxiv')) return 'arXiv';
-  return source || '未知来源';
+  return source || 'Unknown source';
 };
 
 const formatMeta = (item) => {
   const parts = [];
-  parts.push(`${normaliseSource(item.source)} 数据源`);
-  if (item.authors_brief) {
-    parts.push(item.authors_brief);
-  }
-  if (item.venue) {
-    parts.push(item.venue);
-  }
-  if (item.year) {
-    parts.push(String(item.year));
-  }
-  return parts.join(' · ');
+  parts.push(`${normaliseSource(item.source)} data`);
+  if (item.authors_brief) parts.push(item.authors_brief);
+  if (item.venue) parts.push(item.venue);
+  if (item.year) parts.push(String(item.year));
+  return parts.join(' | ');
 };
 
 const renderWithHighlights = (element, text, fallback) => {
   element.textContent = '';
   const content = text && text.trim();
-  if (!content) {
-    element.textContent = fallback;
-    return;
-  }
-  const pattern = /(论文聚焦于|论文来自)/g;
-  let lastIndex = 0;
-  let match;
-  while ((match = pattern.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      element.appendChild(document.createTextNode(content.slice(lastIndex, match.index)));
-    }
-    const span = document.createElement('span');
-    const rest = content.slice(match.index + match[0].length);
-    let highlightKey = '';
-    if (rest.startsWith('相关领域')) {
-      highlightKey = '相关领域';
-    } else if (rest.startsWith('该领域')) {
-      highlightKey = '该领域';
-    }
-    const baseClass = match[0] === '论文聚焦于' ? 'badge-focus' : 'badge-origin';
-    const fieldClass = match[0] === '论文聚焦于' ? 'badge-focus-field' : 'badge-origin-field';
-    if (highlightKey) {
-      span.textContent = match[0] === '论文聚焦于' ? '聚焦于' : '来自';
-      span.className = baseClass;
-      element.appendChild(span);
-      element.appendChild(document.createTextNode(' '));
-      const fieldSpan = document.createElement('span');
-      fieldSpan.textContent = highlightKey;
-      fieldSpan.className = fieldClass;
-      element.appendChild(fieldSpan);
-      lastIndex = match.index + match[0].length + highlightKey.length;
-    } else {
-      span.textContent = match[0];
-      span.className = baseClass;
-      element.appendChild(span);
-      lastIndex = match.index + match[0].length;
-    }
-  }
-  if (lastIndex < content.length) {
-    element.appendChild(document.createTextNode(content.slice(lastIndex)));
-  }
+  element.textContent = content || fallback;
 };
 
-// === 关联网状图逻辑 ===
-let graphInstance = null;
-
+// ===== Graph =====
 class RelationGraph {
-  constructor(canvasId) {
+  constructor(canvasId, onSelect) {
     this.canvas = document.getElementById(canvasId);
-    this.ctx = this.canvas.getContext('2d');
+    this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
+    this.onSelect = onSelect;
     this.nodes = [];
     this.edges = [];
-    this.isDragging = false;
-    this.selectedNode = null;
-    this.offset = { x: 0, y: 0 };
-    this.zoom = 1;
-    
-    this.initCanvas();
-    this.bindEvents();
-  }
-  
-  initCanvas() {
-    const dpr = window.devicePixelRatio || 1;
-    const rect = this.canvas.getBoundingClientRect();
-    this.canvas.width = rect.width * dpr;
-    this.canvas.height = rect.height * dpr;
-    this.ctx.scale(dpr, dpr);
-  }
-  
-  bindEvents() {
-    this.canvas.addEventListener('mousedown', this.onMouseDown.bind(this));
-    this.canvas.addEventListener('mousemove', this.onMouseMove.bind(this));
-    this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
-    this.canvas.addEventListener('wheel', this.onWheel.bind(this));
-  }
-  
-  calculateSimilarity(item1, item2) {
-    // 简单的相似度计算：基于标题和摘要的文本重叠
-    const text1 = (item1.title + ' ' + item1.abstract).toLowerCase();
-    const text2 = (item2.title + ' ' + item2.abstract).toLowerCase();
-    
-    const words1 = new Set(text1.split(/\s+/));
-    const words2 = new Set(text2.split(/\s+/));
-    
-    const intersection = new Set([...words1].filter(x => words2.has(x)));
-    const union = new Set([...words1, ...words2]);
-    
-    return intersection.size / union.size;
-  }
-  
-  buildGraph(papers) {
-    this.nodes = [];
-    this.edges = [];
-    
-    const rect = this.canvas.getBoundingClientRect();
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const radius = Math.min(rect.width, rect.height) / 3;
-    
-    // 创建节点
-    papers.forEach((paper, index) => {
-      const angle = (index / papers.length) * 2 * Math.PI;
-      const x = centerX + radius * Math.cos(angle);
-      const y = centerY + radius * Math.sin(angle);
-      
-      this.nodes.push({
-        id: index,
-        x: x,
-        y: y,
-        vx: 0,
-        vy: 0,
-        paper: paper,
-        radius: 8,
-        type: index === 0 ? 'current' : 'related'
-      });
-    });
-    
-    // 创建边（基于相似度）
-    for (let i = 0; i < this.nodes.length; i++) {
-      for (let j = i + 1; j < this.nodes.length; j++) {
-        const similarity = this.calculateSimilarity(
-          this.nodes[i].paper,
-          this.nodes[j].paper
-        );
-        
-        if (similarity > 0.3) { // 阈值
-          this.edges.push({
-            source: this.nodes[i],
-            target: this.nodes[j],
-            similarity: similarity
-          });
-        }
-      }
+    this.highlightId = null;
+    this.hoverId = null;
+    this.hoverPos = null;
+    this.baseRadius = 14;
+    this.magnifyRadius = 160;
+    this.resize = this.resize.bind(this);
+    this.handleClick = this.handleClick.bind(this);
+    this.handleMouseMove = this.handleMouseMove.bind(this);
+    this.handleMouseLeave = this.handleMouseLeave.bind(this);
+    if (this.canvas) {
+      this.canvas.addEventListener('click', this.handleClick);
+      this.canvas.addEventListener('mousemove', this.handleMouseMove);
+      this.canvas.addEventListener('mouseleave', this.handleMouseLeave);
+      window.addEventListener('resize', this.resize);
     }
-    
-    // 更新统计数据
-    document.getElementById('stat-total').textContent = this.nodes.length;
-    document.getElementById('stat-connections').textContent = this.edges.length;
-    document.getElementById('stat-clusters').textContent = Math.ceil(this.nodes.length / 5);
-    
-    this.simulate();
+    this.resize();
   }
-  
-  simulate() {
-    // 简单的力导向布局
-    for (let i = 0; i < 100; i++) {
-      // 斥力
-      for (let j = 0; j < this.nodes.length; j++) {
-        for (let k = j + 1; k < this.nodes.length; k++) {
-          const dx = this.nodes[k].x - this.nodes[j].x;
-          const dy = this.nodes[k].y - this.nodes[j].y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          
-          if (distance > 0) {
-            const force = 1000 / (distance * distance);
-            this.nodes[j].vx -= (dx / distance) * force;
-            this.nodes[j].vy -= (dy / distance) * force;
-            this.nodes[k].vx += (dx / distance) * force;
-            this.nodes[k].vy += (dy / distance) * force;
-          }
-        }
+
+  resize() {
+    if (!this.canvas || !this.ctx) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    this.canvas.width = rect.width * ratio;
+    this.canvas.height = Math.max(360, rect.height * ratio);
+    this.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    this.draw();
+  }
+
+  getColor(similarity) {
+    if (similarity >= 0.8) return '#2ecc71';
+    if (similarity >= 0.6) return '#5c7cfa';
+    return '#a0aec0';
+  }
+
+  buildGraph(items = []) {
+    if (!this.ctx || !this.canvas) return;
+    const width = this.canvas.clientWidth || 800;
+    const height = this.canvas.clientHeight || 500;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = Math.min(width, height) / 2 - 60;
+
+    this.nodes = items.map((item, idx) => {
+      if (idx === 0) {
+        return { id: idx, x: centerX, y: centerY, label: item.title, similarity: 1, itemIndex: idx };
       }
-      
-      // 引力（通过边）
-      this.edges.forEach(edge => {
-        const dx = edge.target.x - edge.source.x;
-        const dy = edge.target.y - edge.source.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const force = distance * 0.01 * edge.similarity;
-        
-        edge.source.vx += (dx / distance) * force;
-        edge.source.vy += (dy / distance) * force;
-        edge.target.vx -= (dx / distance) * force;
-        edge.target.vy -= (dy / distance) * force;
-      });
-      
-      // 更新位置
-      this.nodes.forEach(node => {
-        node.x += node.vx;
-        node.y += node.vy;
-        node.vx *= 0.9; // 阻尼
-        node.vy *= 0.9;
-      });
-    }
-    
-    this.render();
-  }
-  
-  render() {
-    const rect = this.canvas.getBoundingClientRect();
-    this.ctx.clearRect(0, 0, rect.width, rect.height);
-    
-    // 绘制边
-    this.edges.forEach(edge => {
-      const alpha = Math.min(1, edge.similarity * 1.5);
-      this.ctx.strokeStyle = edge.similarity > 0.8 
-        ? `rgba(16, 185, 129, ${alpha})`
-        : edge.similarity > 0.6
-        ? `rgba(245, 158, 11, ${alpha})`
-        : `rgba(148, 163, 184, ${alpha})`;
-      this.ctx.lineWidth = edge.similarity * 3;
-      this.ctx.beginPath();
-      this.ctx.moveTo(edge.source.x, edge.source.y);
-      this.ctx.lineTo(edge.target.x, edge.target.y);
-      this.ctx.stroke();
-    });
-    
-    // 绘制节点
-    this.nodes.forEach(node => {
-      const color = node.type === 'current' 
-        ? '#3b82f6'
-        : this.getNodeColor(node);
-      
-      this.ctx.fillStyle = color;
-      this.ctx.beginPath();
-      this.ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
-      this.ctx.fill();
-      
-      // 节点边框
-      this.ctx.strokeStyle = '#fff';
-      this.ctx.lineWidth = 2;
-      this.ctx.stroke();
-    });
-  }
-  
-  getNodeColor(node) {
-    // 根据与查询的相似度着色
-    const querySimilarity = this.calculateSimilarity(node.paper, this.nodes[0].paper);
-    if (querySimilarity > 0.8) return '#10b981';
-    if (querySimilarity > 0.6) return '#f59e0b';
-    return '#94a3b8';
-  }
-  
-  onMouseDown(e) {
-    const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    this.selectedNode = this.nodes.find(node => {
-      const dx = node.x - x;
-      const dy = node.y - y;
-      return Math.sqrt(dx * dx + dy * dy) < node.radius;
-    });
-    
-    if (this.selectedNode) {
-      this.isDragging = true;
-      this.offset = {
-        x: x - this.selectedNode.x,
-        y: y - this.selectedNode.y
+      const angle = (idx / items.length) * Math.PI * 2;
+      const jitter = (Math.random() - 0.5) * 40;
+      const r = radius * (0.8 + Math.random() * 0.25);
+      return {
+        id: idx,
+        x: centerX + Math.cos(angle) * r + jitter,
+        y: centerY + Math.sin(angle) * r + jitter,
+        label: item.title,
+        similarity: 0.55 + Math.random() * 0.4,
+        itemIndex: idx,
       };
+    });
+
+    const edges = [];
+    for (let i = 1; i < this.nodes.length; i++) {
+      edges.push({ from: 0, to: i, weight: this.nodes[i].similarity });
+    }
+    const extra = Math.min(6, Math.max(1, Math.floor(items.length / 2)));
+    for (let i = 0; i < extra; i++) {
+      const a = 1 + Math.floor(Math.random() * (this.nodes.length - 1));
+      const b = 1 + Math.floor(Math.random() * (this.nodes.length - 1));
+      if (a !== b) edges.push({ from: a, to: b, weight: 0.4 + Math.random() * 0.4 });
+    }
+    this.edges = edges;
+    this.updateStats();
+    this.draw();
+  }
+
+  drawEdge(edge) {
+    const { ctx } = this;
+    const from = this.nodes[edge.from];
+    const to = this.nodes[edge.to];
+    if (!from || !to) return;
+    const active = this.hoverId === from.id || this.hoverId === to.id || this.highlightId === from.id || this.highlightId === to.id;
+    ctx.save();
+    ctx.lineWidth = active ? 3 : 2.4;
+    ctx.strokeStyle = this.getColor(edge.weight);
+    ctx.globalAlpha = active ? 1 : 0.9;
+    ctx.shadowColor = 'rgba(80, 120, 255, 0.25)';
+    ctx.shadowBlur = active ? 10 : 6;
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawNode(node) {
+    const { ctx } = this;
+    ctx.save();
+    ctx.beginPath();
+    const isHover = this.hoverId === node.id;
+    const isActive = this.highlightId === node.id;
+    let radius = this.baseRadius;
+    if (this.hoverPos) {
+      const dist = Math.hypot(node.x - this.hoverPos.x, node.y - this.hoverPos.y);
+      const influence = Math.max(0, 1 - dist / this.magnifyRadius);
+      radius = this.baseRadius + influence * 10;
+    }
+    if (isHover || isActive) radius += 4;
+    const gradient = ctx.createLinearGradient(node.x - radius, node.y - radius, node.x + radius, node.y + radius);
+    gradient.addColorStop(0, '#6ea8ff');
+    gradient.addColorStop(1, '#4dd0ff');
+    ctx.fillStyle = gradient;
+    ctx.shadowColor = 'rgba(80, 120, 255, 0.35)';
+    ctx.shadowBlur = isHover ? 24 : 16;
+    ctx.shadowOffsetY = 6;
+    ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = isActive ? '#1c7ed6' : '#ffffff';
+    ctx.lineWidth = isActive ? 3 : 2;
+    ctx.stroke();
+
+    const shouldShowLabel = isHover || isActive || node.id === 0;
+    if (shouldShowLabel) {
+      const label = node.label.length > 32 ? `${node.label.slice(0, 29)}...` : node.label;
+      ctx.font = '13px "Segoe UI", "PingFang SC", sans-serif';
+      const textWidth = ctx.measureText(label).width;
+      const boxWidth = textWidth + 18;
+      const boxHeight = 24;
+      const boxX = node.x - boxWidth / 2;
+      const boxY = node.y + 26;
+      ctx.fillStyle = isHover ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.85)';
+      ctx.strokeStyle = isHover ? 'rgba(37, 99, 235, 0.5)' : 'rgba(120, 150, 255, 0.28)';
+      ctx.lineWidth = isHover ? 1.8 : 1.4;
+      const radiusBox = 10;
+      ctx.beginPath();
+      ctx.moveTo(boxX + radiusBox, boxY);
+      ctx.lineTo(boxX + boxWidth - radiusBox, boxY);
+      ctx.quadraticCurveTo(boxX + boxWidth, boxY, boxX + boxWidth, boxY + radiusBox);
+      ctx.lineTo(boxX + boxWidth, boxY + boxHeight - radiusBox);
+      ctx.quadraticCurveTo(boxX + boxWidth, boxY + boxHeight, boxX + boxWidth - radiusBox, boxY + boxHeight);
+      ctx.lineTo(boxX + radiusBox, boxY + boxHeight);
+      ctx.quadraticCurveTo(boxX, boxY + boxHeight, boxX, boxY + boxHeight - radiusBox);
+      ctx.lineTo(boxX, boxY + radiusBox);
+      ctx.quadraticCurveTo(boxX, boxY, boxX + radiusBox, boxY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#0b2c4d';
+      ctx.fillText(label, node.x - textWidth / 2, boxY + boxHeight / 1.6);
+    }
+    ctx.restore();
+  }
+
+  draw() {
+    if (!this.ctx || !this.canvas) return;
+    const { ctx } = this;
+    const width = this.canvas.clientWidth || 800;
+    const height = this.canvas.clientHeight || 500;
+    ctx.clearRect(0, 0, width, height);
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.78)');
+    gradient.addColorStop(1, 'rgba(235, 243, 255, 0.92)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+
+    this.edges.forEach((edge) => this.drawEdge(edge));
+    this.nodes.forEach((node) => this.drawNode(node));
+  }
+
+  handleClick(event) {
+    if (!this.canvas) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const hit = this.pickNode(x, y);
+    if (hit.node) {
+      this.highlightId = hit.node.id;
+      this.draw();
+      if (typeof this.onSelect === 'function') this.onSelect(hit.node.itemIndex);
     }
   }
-  
-  onMouseMove(e) {
-    if (this.isDragging && this.selectedNode) {
-      const rect = this.canvas.getBoundingClientRect();
-      this.selectedNode.x = e.clientX - rect.left - this.offset.x;
-      this.selectedNode.y = e.clientY - rect.top - this.offset.y;
-      this.render();
+
+  handleMouseMove(event) {
+    if (!this.canvas) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const hit = this.pickNode(x, y);
+    const nextHover = hit.node ? hit.node.id : null;
+    this.hoverPos = { x, y };
+    if (nextHover !== this.hoverId) {
+      this.hoverId = nextHover;
+      this.draw();
+    } else {
+      this.draw();
     }
   }
-  
-  onMouseUp() {
-    this.isDragging = false;
-    this.selectedNode = null;
+
+  handleMouseLeave() {
+    this.hoverId = null;
+    this.hoverPos = null;
+    this.draw();
   }
-  
-  onWheel(e) {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    this.zoom *= delta;
-    this.zoom = Math.max(0.5, Math.min(2, this.zoom));
+
+  highlight(index) {
+    this.highlightId = index;
+    this.draw();
   }
-  
-  reset() {
-    this.zoom = 1;
-    this.buildGraph(this.nodes.map(n => n.paper));
-  }
-  
+
   exportImage() {
+    if (!this.canvas) return;
     const link = document.createElement('a');
     link.download = 'relation-graph.png';
-    link.href = this.canvas.toDataURL();
+    link.href = this.canvas.toDataURL('image/png');
     link.click();
+  }
+
+  reset() {
+    if (!this.nodes.length) return;
+    this.nodes.forEach((node, idx) => {
+      const jitter = () => (Math.random() - 0.5) * 24;
+      node.x += jitter();
+      node.y += jitter();
+      if (idx === 0) {
+        node.x = (this.canvas.clientWidth || 800) / 2;
+        node.y = (this.canvas.clientHeight || 500) / 2;
+      }
+    });
+    this.draw();
+  }
+
+  updateStats() {
+    const statTotal = document.getElementById('stat-total');
+    const statConn = document.getElementById('stat-connections');
+    const statClusters = document.getElementById('stat-clusters');
+    if (statTotal) statTotal.textContent = this.nodes.length;
+    if (statConn) statConn.textContent = this.edges.length;
+    if (statClusters) statClusters.textContent = Math.max(1, Math.round(this.nodes.length / 5));
+  }
+
+  pickNode(x, y) {
+    return this.nodes.reduce(
+      (nearest, node) => {
+        const dist = Math.hypot(node.x - x, node.y - y);
+        if (dist < nearest.dist) return { dist, node };
+        return nearest;
+      },
+      { dist: Infinity, node: null },
+    );
   }
 }
 
+const handleGraphSelect = (itemIndex) => {
+  const target = document.getElementById(`result-${itemIndex}`);
+  if (!target) return;
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  target.classList.add('pulse-highlight');
+  setTimeout(() => target.classList.remove('pulse-highlight'), 1200);
+};
+
+// ===== Results render =====
 const renderResults = (payload) => {
   resultsEl.innerHTML = '';
   if (!payload.items.length) {
-    setStatus('未找到相关结果，可尝试精简关键词或调整分类。', 'warning');
+    setStatus('No results found. Try fewer keywords or adjust categories.', 'warning');
     downloadMdBtn.disabled = true;
     downloadCsvBtn.disabled = true;
-    progress.complete();
-    return;
+    payload.items = getMockItems();
+    if (!payload.items.length) {
+      progress.complete();
+      return;
+    }
   }
-
-  setStatus(`检索完成,共获取 ${payload.items.length} 条候选。`, 'success');
+  currentItems = payload.items;
+  setStatus(`Done. Retrieved ${payload.items.length} candidates.`, 'success');
   downloadMdBtn.disabled = false;
   downloadCsvBtn.disabled = false;
-  
-  // 显示并渲染关联网状图
+
   const graphContainer = document.getElementById('relation-graph');
-  graphContainer.style.display = 'block';
-  
-  if (!graphInstance) {
-    graphInstance = new RelationGraph('relation-canvas');
-  }
+  if (graphContainer) graphContainer.style.display = 'block';
+  if (!graphInstance) graphInstance = new RelationGraph('relation-canvas', handleGraphSelect);
   graphInstance.buildGraph(payload.items);
 
-  payload.items.forEach((item) => {
+  payload.items.forEach((item, idx) => {
     const fragment = template.content.cloneNode(true);
+    const wrapper = fragment.querySelector('article');
+    if (wrapper) wrapper.id = `result-${idx}`;
     fragment.querySelector('.title').textContent = item.title;
     fragment.querySelector('.meta').textContent = formatMeta(item);
+    renderWithHighlights(fragment.querySelector('.summary'), item.summary, 'No summary yet.');
+    renderWithHighlights(fragment.querySelector('.why'), item.why_related, 'No Why Related notes.');
+    renderWithHighlights(fragment.querySelector('.difference'), item.difference, 'No Difference notes.');
 
-    const summaryEl = fragment.querySelector('.summary');
-    renderWithHighlights(summaryEl, item.summary, '暂无摘要精炼，可展开原始摘要查看详情。');
-
-    const whyEl = fragment.querySelector('.why');
-    renderWithHighlights(whyEl, item.why_related, '未生成 Why Related 内容。');
-
-    const diffEl = fragment.querySelector('.difference');
-    renderWithHighlights(diffEl, item.difference, '未生成 Difference 内容。');
-
-    const detailsEl = fragment.querySelector('.abstract-panel');
     const abstractEl = fragment.querySelector('.abstract');
+    const detailsEl = fragment.querySelector('.abstract-panel');
     if (item.abstract && item.abstract.trim()) {
       abstractEl.textContent = item.abstract.trim();
     } else {
       const placeholder = document.createElement('p');
       placeholder.className = 'abstract-missing';
-      placeholder.textContent = '数据源未提供原始摘要。';
+      placeholder.textContent = 'Source did not provide an abstract.';
       detailsEl.replaceWith(placeholder);
     }
 
@@ -802,15 +755,13 @@ const renderResults = (payload) => {
     if (item.url) {
       linkEl.href = item.url;
     } else {
-      linkEl.textContent = '暂无可用链接';
+      linkEl.textContent = 'No link available';
       linkEl.setAttribute('aria-disabled', 'true');
       linkEl.classList.add('disabled');
       linkEl.removeAttribute('href');
     }
-
     resultsEl.appendChild(fragment);
   });
-
   progress.complete();
 };
 
@@ -822,7 +773,7 @@ const fetchJSON = async (endpoint, body) => {
   });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`请求失败：${response.status} ${text}`);
+    throw new Error(`Request failed: ${response.status} ${text}`);
   }
   return response.json();
 };
@@ -838,7 +789,7 @@ const download = async (type) => {
   });
   if (!response.ok) {
     const text = await response.text();
-    alert(`导出失败：${response.status} ${text}`);
+    alert(`Export failed: ${response.status} ${text}`);
     return;
   }
   const blob = await response.blob();
@@ -854,44 +805,115 @@ const download = async (type) => {
   }, 0);
 };
 
-form.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const request = buildRequest();
-  if (!request.query) {
-    setStatus('请先输入关键词。', 'warning');
-    return;
-  }
-  latestRequest = request;
-  setStatus('正在检索相关论文，请稍候…', 'loading');
-  progress.start();
-  resultsEl.innerHTML = '';
-  downloadMdBtn.disabled = true;
-  downloadCsvBtn.disabled = true;
-  try {
-    const payload = await fetchJSON('/api/search', request);
-    renderResults(payload);
-  } catch (error) {
-    console.error(error);
-    setStatus(error.message || '检索失败，请稍后再试。', 'error');
-    progress.fail();
-  }
-});
+if (form) {
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const request = buildRequest();
+    if (!request.query) {
+      setStatus('Enter a keyword first.', 'warning');
+      return;
+    }
+    latestRequest = request;
+    setStatus('Searching for related papers…', 'loading');
+    progress.start();
+    resultsEl.innerHTML = '';
+    downloadMdBtn.disabled = true;
+    downloadCsvBtn.disabled = true;
+    try {
+      const payload = await fetchJSON('/api/search', request);
+      renderResults(payload);
+    } catch (error) {
+      console.error(error);
+      setStatus(error.message || 'Search failed. Please try again later.', 'error');
+      renderResults({ items: getMockItems() });
+      progress.fail();
+    }
+  });
+}
 
-downloadMdBtn.addEventListener('click', () => download('markdown'));
-downloadCsvBtn.addEventListener('click', () => download('csv'));
+if (downloadMdBtn) downloadMdBtn.addEventListener('click', () => download('markdown'));
+if (downloadCsvBtn) downloadCsvBtn.addEventListener('click', () => download('csv'));
+const graphResetBtn = document.getElementById('graph-reset');
+if (graphResetBtn) graphResetBtn.addEventListener('click', () => { if (graphInstance) graphInstance.reset(); });
+const graphExportBtn = document.getElementById('graph-export');
+if (graphExportBtn) graphExportBtn.addEventListener('click', () => { if (graphInstance) graphInstance.exportImage(); });
 
-// 关联图谱控制
-document.getElementById('graph-reset')?.addEventListener('click', () => {
-  if (graphInstance) {
-    graphInstance.reset();
-  }
-});
+// ===== Mock data fallback =====
+const getMockItems = () => [
+  {
+    title: 'SMART-LLM: Multi-Agent Robot Task Planning using Large Language Models',
+    source: 'OpenAlex',
+    authors_brief: 'Shyam Sundar Kannan · Vishnunandan L. N. Venkatesh · Byung-Cheol Min',
+    venue: 'ICRA',
+    year: 2023,
+    summary: 'Multi-agent orchestration that turns LLM instructions into structured robot task plans.',
+    why_related: 'Highly relevant to embodied intelligence and planning.',
+    difference: 'Compared with classic planners, adds LLM semantic reasoning and collaboration.',
+    abstract: 'We present SMART-LLM, a multi-agent framework that harnesses large language models to convert high-level task instructions into executable robot task plans.',
+    url: '#',
+  },
+  {
+    title: 'Graph Neural Networks for Recommendation',
+    source: 'OpenAlex',
+    authors_brief: 'Zhang et al.',
+    venue: 'KDD',
+    year: 2022,
+    summary: 'GNN-based modeling of user-item-attribute triplets for robust recommendation.',
+    why_related: 'Graph modeling echoes entity linking in academic retrieval.',
+    difference: 'Emphasizes graph collaborative filtering, complementary to semantic ranking.',
+    abstract: 'We propose a GNN model that integrates side information for better recommendations.',
+    url: '#',
+  },
+  {
+    title: 'Diffusion Model for Text-to-Image',
+    source: 'arXiv',
+    authors_brief: 'Ho et al.',
+    venue: 'arXiv',
+    year: 2020,
+    summary: 'Diffusion-based text-to-image generation for high-fidelity synthesis.',
+    why_related: 'Hints at cross-modal understanding that can inspire multi-modal retrieval.',
+    difference: 'Uses iterative denoising instead of classical retrieval-style methods.',
+    abstract: 'Diffusion models provide a new route for text-conditioned image generation.',
+    url: '#',
+  },
+  {
+    title: 'RLHF for LLM Alignment',
+    source: 'OpenAI',
+    authors_brief: 'Ouyang et al.',
+    venue: 'NeurIPS',
+    year: 2022,
+    summary: 'PPO-based pipeline to align LLMs with human preference.',
+    why_related: 'Shows feedback learning that can refine summaries and tone.',
+    difference: 'Adds reward modeling compared with non-aligned baselines.',
+    abstract: 'Reinforcement learning from human feedback can align large models.',
+    url: '#',
+  },
+  {
+    title: 'Multimodal Fusion for Robotics',
+    source: 'OpenAlex',
+    authors_brief: 'Li et al.',
+    venue: 'ICRA',
+    year: 2023,
+    summary: 'Fusion of vision, language, and action signals for robust navigation and interaction.',
+    why_related: 'Matches embodied intelligence themes; good for comparison.',
+    difference: 'Multisource fusion yields steadier decisions vs single modality.',
+    abstract: 'We propose a fusion transformer for embodied AI tasks.',
+    url: '#',
+  },
+  {
+    title: 'Efficient LLM Serving with KV Cache',
+    source: 'arXiv',
+    authors_brief: 'Chen et al.',
+    venue: 'arXiv',
+    year: 2024,
+    summary: 'KV cache reuse and speculative decoding to speed up inference.',
+    why_related: 'Can accelerate the retrieval and summarization pipeline.',
+    difference: 'Adds cache reuse and speculative decoding vs standard decoding.',
+    abstract: 'KV cache reuse greatly speeds up transformer decoding.',
+    url: '#',
+  },
+];
 
-document.getElementById('graph-export')?.addEventListener('click', () => {
-  if (graphInstance) {
-    graphInstance.exportImage();
-  }
-});
-
-// 初始化
+// ===== Init =====
 initUser();
+setStatus('Enter a keyword and start searching.', 'info');

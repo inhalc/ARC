@@ -10,7 +10,9 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+ROOT_DIR = Path(__file__).resolve().parent.parent / "frontend"
+# Prefer built assets if present, otherwise fall back to source dir (for dev convenience)
+FRONTEND_DIR = ROOT_DIR / "dist" if (ROOT_DIR / "dist").exists() else ROOT_DIR
 DEFAULT_BACKEND_URL = "http://127.0.0.1:8000"
 _EXCLUDED_HEADERS = {"content-encoding", "transfer-encoding", "connection"}
 
