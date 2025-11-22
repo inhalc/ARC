@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
 import { initializeApp } from "firebase/app";
@@ -52,11 +52,12 @@ const generateMockData = (keyword, userContext) => {
   }
   return { nodes, links };
 };
-const ForceGraph = ({ data, onNodeClick, isDarkMode }) => {
+const ForceGraph = ({ data, onNodeClick, isDarkMode, selectedNodeId }) => {
   const canvasRef = useRef(null);
   const nodesRef = useRef([]);
   const mouseRef = useRef({ x: -9999, y: -9999 });
   const frameRef = useRef();
+  const selectedRef = useRef(null);
   const drawRoundRect = (ctx, x, y, w, h, r) => {
     const radius = Math.max(r, 0);
     ctx.beginPath();
@@ -86,6 +87,10 @@ const ForceGraph = ({ data, onNodeClick, isDarkMode }) => {
     }),
     [isDarkMode],
   );
+
+  useEffect(() => {
+    selectedRef.current = selectedNodeId;
+  }, [selectedNodeId]);
 
   useEffect(() => {
     if (!data || !canvasRef.current) return undefined;
@@ -133,17 +138,17 @@ const ForceGraph = ({ data, onNodeClick, isDarkMode }) => {
     const animate = () => {
       const width = view.width;
       const height = view.height;
-      const k = 0.02;
-      const repulsion = 320;
+      const k = 0.015;
+      const repulsion = 520;
       const damping = 0.86;
-      const centerForce = 0.012;
+      const centerForce = 0.009;
 
       for (let i = 0; i < nodes.length; i += 1) {
         for (let j = i + 1; j < nodes.length; j += 1) {
           const dx = nodes[j].x - nodes[i].x;
           const dy = nodes[j].y - nodes[i].y;
           let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          if (dist < 280) {
+          if (dist < 420) {
             const force = repulsion / (dist * dist + 50);
             const fx = (dx / dist) * force;
             const fy = (dy / dist) * force;
@@ -162,7 +167,7 @@ const ForceGraph = ({ data, onNodeClick, isDarkMode }) => {
           const dx = target.x - source.x;
           const dy = target.y - source.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const targetLen = (source.score + target.score) * 80;
+          const targetLen = (source.score + target.score) * 110;
           const force = (dist - targetLen) * k;
           const fx = (dx / dist) * force;
           const fy = (dy / dist) * force;
@@ -209,36 +214,41 @@ const ForceGraph = ({ data, onNodeClick, isDarkMode }) => {
       ctx.fillStyle = theme.bg;
       ctx.fillRect(0, 0, width, height);
 
-      links.forEach((link) => {
-        const source = nodes.find((n) => n.id === link.source);
-        const target = nodes.find((n) => n.id === link.target);
-        if (!source || !target) return;
-        const connectHover = hoveredNode && (source === hoveredNode || target === hoveredNode);
-        ctx.beginPath();
-        ctx.moveTo(source.x, source.y);
-        ctx.lineTo(target.x, target.y);
-        ctx.strokeStyle = connectHover ? theme.lineHighlight : theme.lineColor;
-        ctx.lineWidth = connectHover ? 1.6 : 0.9;
-        ctx.globalAlpha = connectHover ? 1 : 0.8;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
+      const hoveredId = hoveredNode ? hoveredNode.id : null;
+      const selectedId = selectedRef.current;
+
+      const baseLinks = [];
+      const hoverLinks = [];
+      const selectedLinks = [];
+      links.forEach((l) => {
+        const isSel = l.source === selectedId || l.target === selectedId;
+        const isHov = l.source === hoveredId || l.target === hoveredId;
+        if (isSel) selectedLinks.push(l);
+        else if (isHov) hoverLinks.push(l);
+        else baseLinks.push(l);
       });
 
       const time = Date.now() * 0.002;
-      nodes.forEach((node) => {
+      const baseNodes = [];
+      const focusNodes = [];
+      const baseLabels = [];
+      const focusLabels = [];
+
+      const pushNode = (node, isFocus) => {
         const { x, y } = node;
         const r = node.drawRadius;
         let color = theme.nodeNormal;
         if (node.type === "root") color = theme.nodeRoot;
         else if (node.type === "star") color = theme.nodeStar;
-
-        if (node.type === "star" || node.type === "root" || node.hoverScale > 0.1) {
+        const showGlow = node.type === "star" || node.type === "root" || node.hoverScale > 0.1 || isFocus;
+        const showRing = node.hoverScale > 0.01 || node.type === "star" || isFocus;
+        if (showGlow) {
           const glowR = r * (1.4 + Math.sin(time + node.pulsePhase) * 0.1);
           const glow = ctx.createRadialGradient(x, y, r, x, y, glowR);
           glow.addColorStop(0, color);
           glow.addColorStop(1, "transparent");
           ctx.fillStyle = glow;
-          ctx.globalAlpha = 0.2;
+          ctx.globalAlpha = isFocus ? 0.3 : 0.18;
           ctx.beginPath();
           ctx.arc(x, y, glowR, 0, Math.PI * 2);
           ctx.fill();
@@ -250,10 +260,10 @@ const ForceGraph = ({ data, onNodeClick, isDarkMode }) => {
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
 
-        if (node.hoverScale > 0.01 || node.type === "star") {
+        if (showRing) {
           ctx.strokeStyle = color;
-          ctx.lineWidth = 1;
-          ctx.globalAlpha = 0.6;
+          ctx.lineWidth = isFocus ? 2.8 : 1;
+          ctx.globalAlpha = isFocus ? 1 : 0.6;
           ctx.beginPath();
           const ringR = r + 3 + node.hoverScale * 3;
           ctx.arc(x, y, ringR, 0, Math.PI * 2);
@@ -261,21 +271,73 @@ const ForceGraph = ({ data, onNodeClick, isDarkMode }) => {
           ctx.globalAlpha = 1;
         }
 
-        const shouldShowText = node.type === "root" || node.type === "star" || node.hoverScale > 0.12;
+        const shouldShowText = node.type === "root" || node.type === "star" || node.hoverScale > 0.12 || isFocus;
         if (shouldShowText) {
-          const text = node.title.length > 20 ? `${node.title.slice(0, 18)}...` : node.title;
-          const labelY = y + r + 14;
-          ctx.font = "500 11px -apple-system, sans-serif";
+          const text = node.title.length > 32 ? `${node.title.slice(0, 30)}...` : node.title;
+          let labelY = y - r - 16;
+          if (labelY < 20) labelY = y + r + 18;
+          ctx.font = "600 12px -apple-system, sans-serif";
           const textWidth = ctx.measureText(text).width;
+          const entry = { x, labelY, text, textWidth, color, focus: isFocus };
+          (isFocus ? focusLabels : baseLabels).push(entry);
+        }
+      };
+
+      nodes.forEach((node) => {
+        const isFocus = node.id === hoveredId || node.id === selectedId;
+        (isFocus ? focusNodes : baseNodes).push(node);
+      });
+
+      const drawLinks = (linkList, mode) => {
+        linkList.forEach((link) => {
+          const source = nodes.find((n) => n.id === link.source);
+          const target = nodes.find((n) => n.id === link.target);
+          if (!source || !target) return;
+          ctx.beginPath();
+          ctx.moveTo(source.x, source.y);
+          ctx.lineTo(target.x, target.y);
+          let stroke = theme.lineColor;
+          let width = 1;
+          let alpha = 0.5;
+          if (mode === "hover") {
+            stroke = theme.lineHighlight;
+            width = 2;
+            alpha = 0.9;
+          } else if (mode === "selected") {
+            stroke = "rgba(56,189,248,0.95)";
+            width = 2.4;
+            alpha = 1;
+          }
+          ctx.strokeStyle = stroke;
+          ctx.lineWidth = width;
+          ctx.globalAlpha = alpha;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        });
+      };
+
+      // Layering: all links first (base -> hover -> selected) -> nodes (base -> focus) -> labels (base -> focus)
+      drawLinks(baseLinks, "base");
+      drawLinks(hoverLinks, "hover");
+      drawLinks(selectedLinks, "selected");
+      baseNodes.forEach((n) => pushNode(n, false));
+      focusNodes.forEach((n) => pushNode(n, true));
+
+      const drawLabels = (labels) => {
+        labels.forEach(({ x, labelY, text, textWidth, color, focus }) => {
+          ctx.font = "600 12px -apple-system, sans-serif";
           const paddingX = 8;
           const paddingY = 4;
           ctx.fillStyle = theme.labelBg;
-          ctx.strokeStyle = theme.labelBorder;
-          ctx.lineWidth = 1;
+          ctx.strokeStyle = focus ? color : theme.labelBorder;
+          ctx.lineWidth = focus ? 2 : 1;
           const rx = x - textWidth / 2 - paddingX;
           const ry = labelY - 8 - paddingY;
           const rw = textWidth + paddingX * 2;
           const rh = 16 + paddingY;
+          ctx.save();
+          ctx.shadowColor = "rgba(0,0,0,0.15)";
+          ctx.shadowBlur = focus ? 10 : 6;
           if (ctx.roundRect) {
             ctx.beginPath();
             ctx.roundRect(rx, ry, rw, rh, 6);
@@ -284,13 +346,17 @@ const ForceGraph = ({ data, onNodeClick, isDarkMode }) => {
           }
           ctx.fill();
           ctx.stroke();
+          ctx.restore();
           ctx.fillStyle = theme.textMain;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.shadowBlur = 0;
           ctx.fillText(text, x, labelY);
-        }
-      });
+        });
+      };
+
+      drawLabels(baseLabels);
+      drawLabels(focusLabels);
 
       frameRef.current = requestAnimationFrame(animate);
     };
@@ -385,6 +451,26 @@ function App() {
       return [];
     }
   });
+  const userBtnRef = useRef(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    const updatePos = () => {
+      if (!showUserMenu || !userBtnRef.current) return;
+      const rect = userBtnRef.current.getBoundingClientRect();
+      const width = 288; // 72 * 4 px
+      const left = Math.max(12, rect.right + window.scrollX - width);
+      const top = rect.bottom + window.scrollY + 12;
+      setMenuPos({ top, left });
+    };
+    updatePos();
+    window.addEventListener("resize", updatePos);
+    window.addEventListener("scroll", updatePos, true);
+    return () => {
+      window.removeEventListener("resize", updatePos);
+      window.removeEventListener("scroll", updatePos, true);
+    };
+  }, [showUserMenu]);
 
   useEffect(() => {
     if (!auth) {
@@ -457,7 +543,33 @@ function App() {
           difference: item.difference || "N/A",
           url: item.url || item.link || item.primary_url || "",
         }));
-        const links = nodes.slice(1).map((n) => ({ source: "root", target: n.id }));
+        const baseLinks = nodes.slice(1).map((n) => ({ source: "root", target: n.id }));
+        const extras = [];
+        const others = nodes.slice(1);
+        const linkSet = new Set();
+        const pushLink = (s, t) => {
+          if (!s || !t || s === t) return;
+          const key = `${s}->${t}`;
+          const rev = `${t}->${s}`;
+          if (linkSet.has(key) || linkSet.has(rev)) return;
+          linkSet.add(key);
+          extras.push({ source: s, target: t });
+        };
+        baseLinks.forEach((l) => linkSet.add(`${l.source}->${l.target}`));
+        for (let i = 0; i < others.length - 1; i += 1) {
+          pushLink(others[i].id, others[i + 1].id);
+        }
+        for (let i = 0; i < others.length; i += 1) {
+          if (Math.random() > 0.55) {
+            const target = others[Math.floor(Math.random() * others.length)];
+            pushLink(others[i].id, target.id);
+          }
+          if (Math.random() > 0.7) {
+            const target = others[Math.floor(Math.random() * others.length)];
+            pushLink("root", target.id);
+          }
+        }
+        const links = [...baseLinks, ...extras];
         setGraphData({ nodes, links });
         if (nodes.length > 1) setSelectedPaper(nodes[1]);
       } else {
@@ -480,7 +592,7 @@ function App() {
     if (selectedPaper.url) {
       window.open(selectedPaper.url, "_blank");
     } else {
-      alert("暂无外部链接，已定位当前摘要");
+      alert("No external link available. Please review the abstract and summary.");
     }
   };
 
@@ -530,93 +642,120 @@ function App() {
         accentGradient: "from-blue-500 to-indigo-600",
         modal: "bg-white border-slate-100 text-slate-800",
       };
+
+  const controlBtnClass = isDarkMode
+    ? "h-10 px-3 rounded-full border border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 transition-all active:scale-95 flex items-center gap-2 shadow-sm"
+    : "h-10 px-3 rounded-full border border-slate-200 bg-white text-slate-700 hover:border-slate-300 transition-all active:scale-95 flex items-center gap-2 shadow-sm";
   return (
     <div className={`w-full h-screen relative flex flex-col overflow-hidden transition-colors duration-500 ${themeStyles.bg} ${themeStyles.text} font-sans`}>
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         {isDarkMode && <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-blue-900/20 to-transparent opacity-50" />}
       </div>
 
-      <header className={`relative z-30 flex items-center justify-between px-6 py-3 border-b transition-colors ${isDarkMode ? "border-white/5 bg-[#0a0f1c]/80" : "border-slate-200 bg-white/80"} backdrop-blur-md`}>
-        <div className="flex items-center space-x-3">
-          <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${themeStyles.accentGradient} flex items-center justify-center shadow-lg shadow-blue-500/20`}>
-            <Activity className="text-white w-4 h-4" />
+      <header className={`relative z-30 border-b transition-colors ${isDarkMode ? "border-white/5 bg-[#0a0f1c]/80" : "border-slate-200 bg-white/80"} backdrop-blur-md`}>
+        <div className="w-full px-4 md:px-6 py-2.5 flex items-center gap-3 justify-between">
+          <div className="flex items-center gap-2">
+            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${themeStyles.accentGradient} flex items-center justify-center shadow-lg shadow-blue-500/20`}>
+              <Activity className="text-white w-4 h-4" />
+            </div>
+            <span className="text-base font-bold tracking-tight">Paper Agent</span>
           </div>
-          <span className="text-base font-bold tracking-tight">Paper Agent</span>
-        </div>
 
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className={`flex items-center space-x-3 pl-4 pr-2 py-1.5 rounded-full border transition-all duration-200 active:scale-95 group ${isDarkMode ? "bg-white/5 border-white/5 hover:border-white/20" : "bg-white border-slate-200 hover:border-slate-300"}`}
-            >
-              <div className="flex flex-col items-end mr-1">
-                <span className="text-xs font-bold leading-none">{currentAccount.name}</span>
-                <span className="text-[10px] opacity-50 font-medium">{currentAccount.level}</span>
-              </div>
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center bg-gradient-to-tr ${themeStyles.accentGradient} text-white text-[10px] font-bold shadow-md`}>
-                {currentAccount.name[0]}
-              </div>
-            </button>
-
-            {showUserMenu && (
-              <div
-                className={`absolute top-full right-0 mt-3 w-72 p-1.5 rounded-2xl border shadow-2xl z-50 origin-top-right animate-menu-enter ${themeStyles.glass}`}
-                style={{ backdropFilter: "blur(20px) saturate(180%)", WebkitBackdropFilter: "blur(20px) saturate(180%)" }}
+          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+            <div className="relative">
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                ref={userBtnRef}
+                className={`flex items-center space-x-3 pl-4 pr-2 py-1.5 rounded-full border transition-all duration-200 active:scale-95 group ${isDarkMode ? "bg-white/5 border-white/5 hover:border-white/20" : "bg-white border-slate-200 hover:border-slate-300"}`}
               >
-                <div className="px-3 py-2 mb-1">
-                  <p className="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-2">Switch Account</p>
-                  {accounts.map((acc) => (
+                <div className="flex flex-col items-end mr-1">
+                  <span className="text-xs font-bold leading-none">{currentAccount.name}</span>
+                  <span className="text-[10px] opacity-50 font-medium">{currentAccount.level}</span>
+                </div>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center bg-gradient-to-tr ${themeStyles.accentGradient} text-white text-[10px] font-bold shadow-md`}>
+                  {currentAccount.name[0]}
+                </div>
+              </button>
+
+              {showUserMenu && (
+                <div
+                  className={`fixed w-72 p-1.5 rounded-2xl border shadow-2xl z-50 origin-top-right animate-menu-enter overflow-hidden isolate ${themeStyles.glass}`}
+                  style={{
+                    top: menuPos.top,
+                    left: menuPos.left,
+                    backdropFilter: "blur(30px) saturate(220%) brightness(1.02)",
+                    WebkitBackdropFilter: "blur(30px) saturate(220%) brightness(1.02)",
+                    backgroundColor: isDarkMode ? "rgba(10,16,28,0.92)" : "rgba(255,255,255,0.92)",
+                    boxShadow: "0 24px 70px rgba(0,0,0,0.2)",
+                  }}
+                >
+                  <div
+                    className="absolute inset-0 pointer-events-none opacity-25"
+                    style={{
+                      background: isDarkMode
+                        ? "radial-gradient(circle at 20% 20%, rgba(59,130,246,0.35), transparent 40%), radial-gradient(circle at 80% 0%, rgba(236,72,153,0.25), transparent 35%)"
+                        : "radial-gradient(circle at 20% 20%, rgba(59,130,246,0.18), transparent 40%), radial-gradient(circle at 80% 0%, rgba(16,185,129,0.15), transparent 35%)",
+                    }}
+                  />
+                  <div className="px-3 py-2 mb-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-2">Switch Account</p>
+                    {accounts.map((acc) => (
+                      <button
+                        key={acc.id}
+                        onClick={() => {
+                          setCurrentAccount(acc);
+                          setShowUserMenu(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all mb-1 ${currentAccount.id === acc.id ? "bg-blue-500/10 text-blue-500" : "hover:bg-current/5"}`}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${currentAccount.id === acc.id ? "bg-blue-500 text-white" : "bg-gray-500/20 opacity-70"}`}>{acc.name[0]}</div>
+                          <div className="text-left">
+                            <div className="text-xs font-bold leading-none">{acc.name}</div>
+                            <div className="text-[10px] opacity-60">{acc.level}</div>
+                          </div>
+                        </div>
+                        {currentAccount.id === acc.id && <Check size={14} />}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="h-[1px] bg-gradient-to-r from-transparent via-current to-transparent opacity-10 my-1" />
+                  <div className="flex p-1">
                     <button
-                      key={acc.id}
                       onClick={() => {
-                        setCurrentAccount(acc);
+                        setShowAddAccount(true);
                         setShowUserMenu(false);
                       }}
-                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all mb-1 ${currentAccount.id === acc.id ? "bg-blue-500/10 text-blue-500" : "hover:bg-current/5"}`}
+                      className="flex-1 flex items-center justify-center py-2 rounded-lg hover:bg-current/5 transition text-[10px] font-bold opacity-70"
                     >
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${currentAccount.id === acc.id ? "bg-blue-500 text-white" : "bg-gray-500/20 opacity-70"}`}>{acc.name[0]}</div>
-                        <div className="text-left">
-                          <div className="text-xs font-bold leading-none">{acc.name}</div>
-                          <div className="text-[10px] opacity-60">{acc.level}</div>
-                        </div>
-                      </div>
-                      {currentAccount.id === acc.id && <Check size={14} />}
+                      <Plus size={14} className="mr-1" /> Add
                     </button>
-                  ))}
+                    <button
+                      onClick={() => {
+                      setShowManageAccounts(true);
+                        setShowUserMenu(false);
+                      }}
+                      className="flex-1 flex items-center justify-center py-2 rounded-lg hover:bg-current/5 transition text-[10px] font-bold opacity-70"
+                    >
+                      <Settings size={14} className="mr-1" /> Manage
+                    </button>
+                  </div>
                 </div>
-                <div className="h-[1px] bg-gradient-to-r from-transparent via-current to-transparent opacity-10 my-1" />
-                <div className="flex p-1">
-                  <button
-                    onClick={() => {
-                      setShowAddAccount(true);
-                      setShowUserMenu(false);
-                    }}
-                    className="flex-1 flex items-center justify-center py-2 rounded-lg hover:bg-current/5 transition text-[10px] font-bold opacity-70"
-                  >
-                    <Plus size={14} className="mr-1" /> Add
-                  </button>
-                  <button
-                    onClick={() => {
-                    setShowManageAccounts(true);
-                      setShowUserMenu(false);
-                    }}
-                    className="flex-1 flex items-center justify-center py-2 rounded-lg hover:bg-current/5 transition text-[10px] font-bold opacity-70"
-                  >
-                    <Settings size={14} className="mr-1" /> Manage
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          <button
-            onClick={toggleTheme}
-            className={`p-2 rounded-full transition-all active:scale-90 ${isDarkMode ? "bg-white/5 hover:bg-white/10" : "bg-black/5 hover:bg-black/10"}`}
-          >
-            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
+            <button onClick={toggleTheme} className={controlBtnClass}>
+              {isDarkMode ? <Moon size={16} /> : <Sun size={16} />}
+            </button>
+            <a
+              href="https://github.com/inhalc/ARC"
+              target="_blank"
+              rel="noreferrer"
+              className={`${controlBtnClass} hidden sm:inline-flex text-sm font-semibold`}
+            >
+              <span>GitHub</span>
+            </a>
+          </div>
         </div>
       </header>
 
@@ -667,7 +806,7 @@ function App() {
 
         <div className="flex-1 relative overflow-hidden">
           <div className="absolute inset-0 pointer-events-none opacity-[0.05] bg-[radial-gradient(circle_at_1px_1px,currentColor_1px,transparent_0)] bg-[length:32px_32px]" />
-          <ForceGraph data={graphData} onNodeClick={setSelectedPaper} isDarkMode={isDarkMode} />
+          <ForceGraph data={graphData} onNodeClick={setSelectedPaper} isDarkMode={isDarkMode} selectedNodeId={selectedPaper?.id} />
           {searchStatus === "searching" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-black/20 backdrop-blur-[1px]">
               <div className="w-10 h-10 rounded-full border-[3px] border-blue-500/30 border-t-blue-500 animate-spin mb-3" />
@@ -713,7 +852,7 @@ function App() {
                 <h2 className="text-xl font-bold leading-snug mb-2">{selectedPaper.title}</h2>
                 <div className="flex items-center space-x-2 text-xs font-medium opacity-60 mb-4">
                   <span>{selectedPaper.author}</span>
-                  <span>•</span>
+                  <span>?</span>
                   <span>{selectedPaper.year}</span>
                 </div>
               </div>
@@ -745,9 +884,12 @@ function App() {
               </div>
 
               <div className="p-6 pt-2 border-t border-white/5 flex-shrink-0">
-                <button className={`w-full py-3 rounded-xl font-bold text-sm shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2 bg-gradient-to-r ${themeStyles.accentGradient} text-white relative overflow-hidden group`}>
+                <button
+                  onClick={handleReadFullPaper}
+                  className={`w-full py-3 rounded-xl font-bold text-sm shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2 bg-gradient-to-r ${themeStyles.accentGradient} text-white relative overflow-hidden group`}
+                >
                   <BookOpen size={16} />
-                  <span onClick={handleReadFullPaper}>Read Full Paper</span>
+                  <span>Read Full Paper</span>
                 </button>
               </div>
             </>
